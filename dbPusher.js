@@ -44,7 +44,9 @@ module.exports = function(sequelize, models) {
     connectionEntity = await models.connections.create({
         source: source.id,
         target: target.id,
-        day: day
+        day: day,
+        cost: 1,
+        reverseCost: 255
     });
 
     return true;
