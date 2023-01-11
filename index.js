@@ -1,99 +1,29 @@
 require('dotenv').config()
 const VkBot = require('node-vk-bot-api');
-const Sequelize   = require('sequelize');
-
 const bot = new VkBot(process.env.TOKEN);
-const hwBotId = -172959149;
 
+const Sequelize   = require('sequelize');
 const db = new Sequelize(process.env.DB);
+
 db.Op = Sequelize.Op;
 let models = {};
-models.devices = require('./models/devices.js')(db, Sequelize);
+models.devices = require('./app/models/devices.js')(db, Sequelize);
 models.devices.sync();
-models.connections = require('./models/connections.js')(db, Sequelize);
+models.connections = require('./app/models/connections.js')(db, Sequelize);
 models.connections.sync();
 db.query("CREATE EXTENSION PostGIS;");
 db.query("CREATE EXTENSION pgRouting;");
 
-const pushToDB = require('./dbPusher.js')(db, models);
-const dijkstra = require('./dijkstra.js')(db, models);
+let dbop = {};
+dbop.pushToDB = require('./app/dbop/dbPusher.js')(db, models);
+dbop.dijkstra = require('./app/dbop/dijkstra.js')(db, models);
+dbop.stats = require('./app/dbop/stats.js')(db, models);
 
-bot.command('/start', (ctx) => {
-  ctx.reply('Привет! Кидай мне сообщения с местоположениями устройств.');
-});
+require('./app/messages/start.js')(bot, dbop, getDates());
+require('./app/messages/route.js')(bot, dbop, getDates());
+require('./app/messages/stats.js')(bot, dbop, getDates());
 
-bot.command('/route', async (ctx) => {
-  const args = ctx.message.text.split(' ');
-  if (args.length <= 2) {
-    ctx.reply('Укажи исходное и конечное устройство, например /route 00 FF')
-    return;
-  }
-
-  const result = await dijkstra(args[1], args[2]);
-  console.log(result);
-  if (result === null) {
-    ctx.reply('У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить такой маршрут.');
-    return;
-  }
-  
-  ctx.reply('Кратчайший известный машрут: ' + result.join(' => '));
-})
-
-bot.on(async ctx => {
-  const msg = ctx.message;
-  if (typeof(msg.fwd_messages) == 'undefined') {
-    return;
-  }
-
-  const now = new Date();
-  const dates = getDates();
-  const updateTime = new Date(now.getFullYear(), now.getMonth(), dates.dayOfMonth, 18);
-  const updateTimeStamp = updateTime.getTime() / 1000;
-
-  let replies = [];
-  for (const src of msg.fwd_messages) {
-    if (src.from_id != hwBotId) {
-      return;
-    }
-
-    if (src.date < updateTimeStamp) {
-      return;
-    }
-
-    if (!src.text.startsWith('📟Устройство:')) {
-      return;
-    }
-
-    if (!src.text.includes('\n🌐Подключения:')) {
-      return;
-    }
-
-    const lines = src.text.split('\n');
-    let device = lines[0].substring(lines[0].length - 8);
-    let connections = [];
-    let foundConnection = false;
-    lines.forEach(line => {
-      if (foundConnection) {
-        if (line.startsWith('📟') && connections.length < 3) {
-          connections.push(line.substring(2));
-        }
-        return;
-      }
-
-      if (line === '🌐Подключения:') {
-        foundConnection = true;
-      }
-    });
-
-    const result = await pushToDB(device, connections, dates.day);
-    if (result) {
-      console.log('added ' + device + ' linked to ' + connections.join(' '));
-      replies.push('Устройство 📟' + device + ' отмечено как связанное с 📟' + connections.join(', 📟'));
-    }
-  };
-
-  ctx.reply('Спасибо!\n' + replies.join('\n'));
-});
+require('./app/messages/plain.js')(bot, dbop, getDates());
 
 function getDates() {
   const now = new Date();
