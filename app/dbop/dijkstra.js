@@ -3,7 +3,7 @@ module.exports = function(sequelize, models) {
     const sourceId = await getDeviceIdByShortCode(sourceShort);
     const targetId = await getDeviceIdByShortCode(targetShort);
 
-    const query = "SELECT * FROM pgr_dijkstra('SELECT id, source, target, cost, 256 FROM connections WHERE day = 10'," + sourceId + ", " + targetId + ", true);";
+    const query = `SELECT * FROM pgr_dijkstra('SELECT id, source, target, cost, 256 FROM connections WHERE day = ${day}', ${sourceId}, ${targetId}, true);`;
     let routeResult = [];
     try {
         routeResult = await sequelize.query(query);

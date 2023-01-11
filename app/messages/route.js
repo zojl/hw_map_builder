@@ -8,7 +8,7 @@ module.exports = function(bot, dbop, dates) {
 			return;
 		}
 
-		const result = await dbop.dijkstra(args[1], args[2]);
+		const result = await dbop.dijkstra(args[1], args[2], dates.day);
 		console.log(result);
 		if (result === null) {
 			ctx.reply('У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить такой маршрут.');
