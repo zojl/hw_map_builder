@@ -1,31 +1,32 @@
 require('dotenv').config()
 const VkBot = require('node-vk-bot-api');
-const bot = new VkBot(process.env.TOKEN);
-
 const Sequelize   = require('sequelize');
-const db = new Sequelize(process.env.DB);
 
-db.Op = Sequelize.Op;
-let models = {};
-models.devices = require('./app/models/devices.js')(db, Sequelize);
-models.devices.sync();
-models.connections = require('./app/models/connections.js')(db, Sequelize);
-models.connections.sync();
-db.query("CREATE EXTENSION PostGIS;");
-db.query("CREATE EXTENSION pgRouting;");
+let app = {};
+app.bot = new VkBot(process.env.TOKEN);
+app.db = new Sequelize(process.env.DB);
 
-let dbop = {};
-dbop.pushToDB = require('./app/dbop/dbPusher.js')(db, models);
-dbop.dijkstra = require('./app/dbop/dijkstra.js')(db, models);
-dbop.stats = require('./app/dbop/stats.js')(db, models);
+app.db.Op = Sequelize.Op;
+app.model = {};
+app.model.devices = require('./app/model/devices.js')(app.db, Sequelize);
+app.model.devices.sync();
+app.model.connections = require('./app/model/connections.js')(app.db, Sequelize);
+app.model.connections.sync();
+app.models = app.model; //todo убрать
+app.db.query("CREATE EXTENSION PostGIS;");
+app.db.query("CREATE EXTENSION pgRouting;");
 
-require('./app/messages/start.js')(bot, dbop, getDates());
-require('./app/messages/route.js')(bot, dbop, getDates());
-require('./app/messages/stats.js')(bot, dbop, getDates());
+app.repository = {};
+app.repository.connection = require('./app/repository/connection.js')(app.db, app.model);
+app.repository.device = require('./app/repository/device.js')(app.db, app.model);
 
-require('./app/messages/plain.js')(bot, dbop, getDates());
+app.dbUtil = {};
+app.dbUtil.pushToDB = require('./app/dbUtil/dbPusher.js')(app.db, app.model);
+app.dbUtil.dijkstra = require('./app/dbUtil/dijkstra.js')(app.db, app.model);
+app.dbUtil.stats = require('./app/dbUtil/stats.js')(app.db, app.model);
+app.dbUtil.unvisited = require('./app/dbUtil/unvisited.js')(app);
 
-function getDates() {
+app.getDates = function() {
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 0);
   const diff = (now - start) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
@@ -48,4 +49,11 @@ function getDates() {
   }
 }
 
-bot.startPolling();
+require('./app/messages/start.js')(app.bot, app.dbUtil, app.getDates);
+require('./app/messages/route.js')(app.bot, app.dbUtil, app.getDates);
+require('./app/messages/stats.js')(app.bot, app.dbUtil, app.getDates);
+require('./app/messages/analyse.js')(app);
+
+require('./app/messages/plain.js')(app.bot, app.dbUtils, app.getDates);
+
+app.bot.startPolling();

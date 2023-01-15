@@ -1,7 +1,7 @@
-module.exports = function(bot, dbop, dates) {
+module.exports = function(bot, dbop, getDates) {
 	bot.command('/route', async (ctx) => {
-		console.log(ctx);
 
+		let dates = getDates();
 		const args = ctx.message.text.split(' ');
 		if (args.length <= 2) {
 			ctx.reply('Укажи исходное и конечное устройство, например /route 00 FF')

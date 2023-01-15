@@ -1,5 +1,6 @@
-module.exports = function(bot, dbop, dates) {
+module.exports = function(bot, dbop, getDates) {
 	bot.on(async ctx => {
+		let dates = getDates();
 		const msg = ctx.message;
 		if (typeof(msg.fwd_messages) == 'undefined' || msg.fwd_messages.length == 0) {
 			ctx.reply('Пересылай сообщения от бота с 📟устройствами и вызывай /route xx yy для построения маршрутов.');

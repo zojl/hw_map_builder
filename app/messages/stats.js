@@ -1,7 +1,8 @@
-module.exports = function(bot, dbop, dates) {
+module.exports = function(bot, dbop, getDates) {
 	const devicesCount = 256;
 	const linkToDeviceCount = 3;
 	bot.command('/stats', async (ctx) => {
+		let dates = getDates();
 		const data = await dbop.stats(dates.day);
 		const reply = "С последней перестройки карты обнаружено:\n Исходных устройств: " + formatCount(data.sources) + "\n Целевых устройств: " + formatCount(data.targets);
 		ctx.reply(reply);

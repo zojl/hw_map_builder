@@ -20,7 +20,6 @@ module.exports = function(sequelize, models) {
     }
 
     const codesByIds = await getDeviceCodesByIds(deviceIds);
-    console.log(codesByIds);
 
     let codesSorted = [];
     for (const id of deviceIds) {
