@@ -5,7 +5,7 @@ module.exports = function(app) {
 		let dates = app.getDates();
 		const msg = ctx.message;
 		if (typeof(msg.fwd_messages) == 'undefined' || msg.fwd_messages.length == 0) {
-			ctx.reply('Пересылай сообщения от бота с 📟устройствами и вызывай /route xx yy для построения маршрутов.');
+			sendHelp(ctx);
 			return;
 		}
 
@@ -14,54 +14,76 @@ module.exports = function(app) {
 		const updateTimeStamp = updateTime.getTime() / 1000;
 
 		let replies = [];
+		let lastDevice = null;
 		for (const src of msg.fwd_messages) {
 			if (src.from_id != process.env.HW_BOT_ID) {
-				return;
+				continue;
 			}
 
 			if (src.date < updateTimeStamp) {
-				return;
+				continue;
 			}
 
 			if (!src.text.startsWith('📟Устройство:')) {
-				return;
+				continue;
 			}
 
 			if (!src.text.includes('\n🌐Подключения:')) {
-				return;
+				continue;
 			}
 
 			const lines = src.text.split('\n');
 			let device = lines[0].substring(lines[0].length - 8);
 			let connections = [];
 			let foundConnection = false;
-			lines.forEach(line => {
+			for (const line of lines) {
 				if (foundConnection) {
 					if (line.startsWith('📟') && connections.length < 3) {
 						connections.push(line.substring(2));
 					}
 
-					return;
+					continue;
 				}
 
 				if (line === '🌐Подключения:') {
 					foundConnection = true;
 				}
-			});
+			};
 
 			const result = await app.dbUtil.pushToDB(device, connections, dates.day);
 			if (result) {
 				console.log('added ' + device + ' linked to ' + connections.join(' '));
 				replies.push('Устройство 📟' + device + ' отмечено как связанное с 📟' + connections.join(', 📟'));
 			}
+			lastDevice = device;
 
 			if (process.env.IS_STATBOT_ENABLED == 'true') {
 				sendToStatBot(ctx.message.from_id, src.text);
 			}
 		};
 
-		ctx.reply('Спасибо!\n' + replies.join('\n'));
+		if (lastDevice !== null) {
+			let unvisitedMessage = '\n' + await getUnknownConnections(lastDevice, dates.day);
+			ctx.reply('Спасибо!\n' + replies.join('\n') + unvisitedMessage);
+			return;
+		}
+
+		sendHelp(ctx);
 	});
+
+	function sendHelp(ctx) {
+		ctx.reply('Пересылай сообщения от бота с 📟устройствами и вызывай /route xx yy для построения маршрутов.');
+	}
+
+	async function getUnknownConnections(deviceCode, day) {
+		const device = await app.repository.device.getOneByCode(deviceCode);
+		const unvisited = await app.dbUtil.unvisited.getBySourceIdAndDay(device.id, day);
+		if (unvisited.notFound.length == 0) {
+			return 'Все 📟устройства, связанные с 📟' + deviceCode + ' уже были исследованы';
+		}
+
+		return '📟Устройство ' + deviceCode + ' связано со следующими неисследованными: 📟' + unvisited.notFound.join(', 📟');
+	}
 
 	function sendToStatBot(userId, message) {
 		let apiDTO = extend({}, app.service.statBotApi.getDefaultDTO());

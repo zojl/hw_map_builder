@@ -44,12 +44,12 @@ module.exports = function(app) {
 	}
 
 	async function getBySourceIdAndDay(sourceId, day) {
-		const сonnections = await findConnections(deviceConnections, dates.day);
+		const сonnections = await app.repository.connection.getAllBySourceAndDay(sourceId, day);
 
-		if (connections.length == 0) {
+		if (сonnections.length == 0) {
 			return null;
 		}
 
-		return findConnections(connections, day);
+		return getByConnectionsAndDay(сonnections, day);
 	}
 }
