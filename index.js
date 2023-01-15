@@ -26,6 +26,9 @@ app.dbUtil.dijkstra = require('./app/dbUtil/dijkstra.js')(app.db, app.model);
 app.dbUtil.stats = require('./app/dbUtil/stats.js')(app.db, app.model);
 app.dbUtil.unvisited = require('./app/dbUtil/unvisited.js')(app);
 
+app.service = {};
+app.service.statBotApi = require('./app/service/statBotApi.js')(app);
+
 app.getDates = function() {
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 0);
@@ -54,6 +57,6 @@ require('./app/messages/route.js')(app.bot, app.dbUtil, app.getDates);
 require('./app/messages/stats.js')(app.bot, app.dbUtil, app.getDates);
 require('./app/messages/analyse.js')(app);
 
-require('./app/messages/plain.js')(app.bot, app.dbUtils, app.getDates);
+require('./app/messages/plain.js')(app);
 
 app.bot.startPolling();

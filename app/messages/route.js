@@ -1,6 +1,30 @@
 module.exports = function(bot, dbop, getDates) {
-	bot.command('/route', async (ctx) => {
+	bot.command('/r', (ctx) => {
+		handleCommand(ctx);
+	})
 
+	bot.command('/p', (ctx) => {
+		handleCommand(ctx);
+	})
+
+	bot.command('/w', (ctx) => {
+		handleCommand(ctx);
+	})
+
+	bot.command('/route', (ctx) => {
+		handleCommand(ctx);
+	})
+
+
+	bot.command('/path', (ctx) => {
+		handleCommand(ctx);
+	})
+
+	bot.command('/way', (ctx) => {
+		handleCommand(ctx);
+	})
+
+	async function handleCommand(ctx) {
 		let dates = getDates();
 		const args = ctx.message.text.split(' ');
 		if (args.length <= 2) {
@@ -16,5 +40,5 @@ module.exports = function(bot, dbop, getDates) {
 		}
 
 		ctx.reply('Кратчайший известный машрут: ' + result.join(' => '));
-	})
+	}
 }
