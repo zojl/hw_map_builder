@@ -1,6 +1,6 @@
 require('dotenv').config()
 const VkBot = require('node-vk-bot-api');
-const Sequelize   = require('sequelize');
+const Sequelize = require('sequelize');
 
 let app = {};
 app.bot = new VkBot(process.env.TOKEN);
@@ -27,7 +27,8 @@ app.dbUtil.stats = require('./app/dbUtil/stats.js')(app.db, app.model);
 app.dbUtil.unvisited = require('./app/dbUtil/unvisited.js')(app);
 
 app.service = {};
-app.service.statBotApi = require('./app/service/statBotApi.js')(app);
+app.service.vHackApi = require('./app/service/vHackApi.js')(app);
+app.service.statBotImporter = require('./app/service/statBotImporter.js')(app);
 
 app.getDates = function() {
   const now = new Date();
@@ -58,5 +59,8 @@ require('./app/messages/stats.js')(app.bot, app.dbUtil, app.getDates);
 require('./app/messages/analyse.js')(app);
 
 require('./app/messages/plain.js')(app);
+
+app.service.statBotImporter.updateMap();
+console.info('bot started');
 
 app.bot.startPolling();

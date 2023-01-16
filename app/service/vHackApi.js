@@ -61,8 +61,8 @@ module.exports =
     }
 
     function send(dto) {
-        const url = process.env.STATBOT_HOST + 'api/network';
-        dto.token = process.env.STATBOT_TOKEN;
+        const url = process.env.VHINFO_HOST + '/api/network';
+        dto.token = process.env.VHINFO_TOKEN;
 
         const requestData = JSON.stringify(dto);
         const options = { 

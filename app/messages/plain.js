@@ -86,7 +86,7 @@ module.exports = function(app) {
 	}
 
 	function sendToStatBot(userId, message) {
-		let apiDTO = extend({}, app.service.statBotApi.getDefaultDTO());
+		let apiDTO = extend({}, app.service.vHackApi.getDefaultDTO());
 		apiDTO.ident = userId;
 
 		let connectionsLine = null;
@@ -121,6 +121,6 @@ module.exports = function(app) {
 			}
 		}
 
-		app.service.statBotApi.send(apiDTO);
+		app.service.vHackApi.send(apiDTO);
 	}
 };
