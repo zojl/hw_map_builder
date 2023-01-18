@@ -4,7 +4,7 @@ const Sequelize = require('sequelize');
 
 let app = {};
 app.bot = new VkBot(process.env.TOKEN);
-app.db = new Sequelize(process.env.DB);
+app.db = new Sequelize(process.env.DB, {logging: process.env.ENV.toLowerCase() === 'dev'});
 
 app.db.Op = Sequelize.Op;
 app.model = {};
@@ -60,7 +60,19 @@ require('./app/messages/analyse.js')(app);
 
 require('./app/messages/plain.js')(app);
 
-app.service.statBotImporter.updateMap();
+app.service.statBotImporter.initImport(2.5 * 60 * 1000);
 console.info('bot started');
 
-app.bot.startPolling();
+app.bot.use(async (ctx, next) => {
+  try {
+    await next();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+app.bot.startPolling((err) => {
+  if (err) {
+    console.error(err);
+  }
+});

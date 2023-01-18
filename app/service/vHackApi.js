@@ -63,6 +63,7 @@ module.exports =
     function send(dto) {
         const url = process.env.VHINFO_HOST + '/api/network';
         dto.token = process.env.VHINFO_TOKEN;
+        dto.ident = 'chinamap / ' + ident;
 
         const requestData = JSON.stringify(dto);
         const options = { 

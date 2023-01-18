@@ -4,4 +4,4 @@ RUN mkdir /bot
 WORKDIR /bot
 COPY ./ /bot/
 RUN npm install
-CMD node index.js
+CMD node --trace-warnings index.js

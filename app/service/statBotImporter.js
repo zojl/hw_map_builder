@@ -2,15 +2,18 @@ module.exports = function(app) {
 	const md5 = require('md5');
 	const https = require('https');
 	let lasfUpdateHash = null;
+	let timerId = null;
+
+	const url = process.env.STATBOT_HOST + '/api/v1/event/server-map/';
+	const options = {'User-Agent': 'c0nd0rs_map_builder/1.0'};
 
 	return {
-		updateMap
+		updateMap,
+		initImport,
+		stopImport
 	}
 
 	async function updateMap() {
-		const url = process.env.STATBOT_HOST + '/api/v1/event/server-map/';
-
-		const options = {'User-Agent': 'c0nd0rs_map_builder/1.0'};
 		const request = https.get(url, options, (response) => {
 			if (response.statusCode !== 200) {
 				console.log(response);
@@ -46,12 +49,9 @@ module.exports = function(app) {
 				}
 
 				for (const mapConnection of map.data) {
-					const source = mapConnection.from;
-					for (const target of mapConnection.to) {
-						const addResult = await app.dbUtil.pushToDB(source, target, dates.day);
-						if (addResult) {
-							addedCounter++;
-						}
+					const addResult = await app.dbUtil.pushToDB(mapConnection.from, mapConnection.to, dates.day);
+					if (addResult) {
+						addedCounter++;
 					}
 				}
 
@@ -59,5 +59,19 @@ module.exports = function(app) {
 				lasfUpdateHash = responseHash;
             });
 		});
+	}
+
+	function initImport(timeout) {
+		stopImport();
+
+		updateMap();
+		timerdId = setInterval(function(){updateMap();}, timeout);
+	}
+
+	function stopImport() {
+		if (timerId !== null) {
+			clearInterval(timerId);
+			timerId = null;	
+		}
 	}
 }
