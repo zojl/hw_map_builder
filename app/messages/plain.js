@@ -107,6 +107,42 @@ module.exports = function(app) {
 				apiDTO.users = parseInt(lineComponents[1]);
 			}
 
+			if (line.startsWith('🎯💣')) {
+				apiDTO.npcs.push({
+					"name": line.substring('🎯'.length),
+					"npc": 4, // # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый
+					"type": "nu"
+				})
+			}
+
+			if (
+				line.startsWith('⚖💣')
+				|| line.startsWith('⚖🔸')
+			) {
+				apiDTO.npcs.push({
+					"name": line.substring('⚖'.length),
+					"npc": 3,
+					"type": "nu"
+				})
+			}
+
+			if (line.startsWith('⚔💣')) {
+				apiDTO.npcs.push({
+					"name": line.substring('⚔'.length),
+					"npc": 2,
+					"type": "nu"
+				})
+			}
+
+			if (line.startsWith('👀')) {
+				apiDTO.npcs.push({
+					"name": line.substring('👀'.length),
+					"npc": 1,
+					"type": "nu"
+				})
+			}
+
+
 			if (line === '🌐Подключения:') {
 				connectionsLine = index;
 			}
