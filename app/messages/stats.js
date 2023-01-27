@@ -1,10 +1,10 @@
-module.exports = function(bot, dbop, getDates) {
+module.exports = function(app) {
 	const devicesCount = 256;
 	const linkToDeviceCount = 3;
-	bot.command('/stats', async (ctx) => {
-		let dates = getDates();
-		const data = await dbop.stats(dates.day);
-		const reply = "С последней перестройки карты обнаружено:\n Исходных устройств: " + formatCount(data.sources) + "\n Целевых устройств: " + formatCount(data.targets);
+	app.bot.command('/stats', async (ctx) => {
+		let dates = app.getDates();
+		const stats = await app.dbUtil.stats(dates.day);
+		const reply = "С последней перестройки карты обнаружено:\n Исходных устройств: " + formatCount(stats.sources) + "\n Целевых устройств: " + formatCount(stats.targets);
 		ctx.reply(reply);
 	});
 

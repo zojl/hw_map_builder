@@ -58,12 +58,16 @@ module.exports = function(app) {
 			lastDevice = device;
 
 			if (process.env.IS_STATBOT_ENABLED == 'true') {
-				sendToStatBot(ctx.message.from_id, src.text);
+				try {
+					sendToStatBot(ctx.message.from_id, src.text, src.date);
+				} catch (error) {
+					console.error(error);
+				}
 			}
 		};
 
 		if (lastDevice !== null) {
-			let unvisitedMessage = '\n' + await getUnknownConnections(lastDevice, dates.day);
+			let unvisitedMessage = await app.dbUtil.unvisited.makeMessageByCodeAndDay(lastDevice, dates.day);
 			ctx.reply('Спасибо!\n' + replies.join('\n') + unvisitedMessage);
 			return;
 		}
@@ -75,19 +79,10 @@ module.exports = function(app) {
 		ctx.reply('Пересылай сообщения от бота с 📟устройствами и вызывай /route xx yy для построения маршрутов.');
 	}
 
-	async function getUnknownConnections(deviceCode, day) {
-		const device = await app.repository.device.getOneByCode(deviceCode);
-		const unvisited = await app.dbUtil.unvisited.getBySourceIdAndDay(device.id, day);
-		if (unvisited.notFound.length == 0) {
-			return 'Все 📟устройства, связанные с 📟' + deviceCode + ' уже были исследованы';
-		}
-
-		return '📟Устройство ' + deviceCode + ' связано со следующими неисследованными: 📟' + unvisited.notFound.join(', 📟');
-	}
-
-	function sendToStatBot(userId, message) {
+	function sendToStatBot(userId, message, timestamp) {
 		let apiDTO = extend({}, app.service.vHackApi.getDefaultDTO());
 		apiDTO.ident = userId;
+		apiDTO.timestamp = timestamp;
 
 		let connectionsLine = null;
 		const lines = message.split('\n')
@@ -96,19 +91,19 @@ module.exports = function(app) {
 			const lineComponents = line.split(' ');
 
 			if (line.startsWith('📟Устройство: ')) {
-				apiDTO.device = parseInt(line.substring(line.length - 2), 16);
+				apiDTO.device_info.device = parseInt(line.substring(line.length - 2), 16);
 			}
 
 			if (line.startsWith('👥Союзники: ')) {
-				apiDTO.allies = parseInt(lineComponents[1]);
+				apiDTO.device_info.allies = parseInt(lineComponents[1]);
 			}
 
 			if (line.startsWith('👥Пользователи: ')) {
-				apiDTO.users = parseInt(lineComponents[1]);
+				apiDTO.device_info.users = parseInt(lineComponents[1]);
 			}
 
 			if (line.startsWith('🎯💣')) {
-				apiDTO.npcs.push({
+				apiDTO.device_info.npcs.push({
 					"name": line.substring('🎯'.length),
 					"npc": 4, // # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый
 					"type": "nu"
@@ -119,7 +114,7 @@ module.exports = function(app) {
 				line.startsWith('⚖💣')
 				|| line.startsWith('⚖🔸')
 			) {
-				apiDTO.npcs.push({
+				apiDTO.device_info.npcs.push({
 					"name": line.substring('⚖'.length),
 					"npc": 3,
 					"type": "nu"
@@ -127,7 +122,7 @@ module.exports = function(app) {
 			}
 
 			if (line.startsWith('⚔💣')) {
-				apiDTO.npcs.push({
+				apiDTO.device_info.npcs.push({
 					"name": line.substring('⚔'.length),
 					"npc": 2,
 					"type": "nu"
@@ -135,7 +130,7 @@ module.exports = function(app) {
 			}
 
 			if (line.startsWith('👀')) {
-				apiDTO.npcs.push({
+				apiDTO.device_info.npcs.push({
 					"name": line.substring('👀'.length),
 					"npc": 1,
 					"type": "nu"
@@ -153,7 +148,7 @@ module.exports = function(app) {
 				&& line.startsWith('📟')
 			) {
 				const deviceNumber = index - connectionsLine;
-				apiDTO['device' + deviceNumber] = parseInt(line.substring(line.length - 2), 16);
+				apiDTO.device_info['device' + deviceNumber] = parseInt(line.substring(line.length - 2), 16);
 			}
 		}
 

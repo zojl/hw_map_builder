@@ -1,46 +1,29 @@
 module.exports = function(app) {
 	return {
-		getByConnectionsAndDay,
+		makeMessageByCodeAndDay,
 		getBySourceIdAndDay
 	}
 
-	async function getByConnectionsAndDay(deviceConnections, day) {
-		const connectedTargetIds = deviceConnections.map(connection => connection.target);
-		const connectionsFound = await app.repository.connection.getAllBySourceAndDay(connectedTargetIds, day);
-
-		let connectionsFoundIds = [];
-		for (const connectionFound of connectionsFound) {
-			if (!connectionsFoundIds.includes(connectionFound.source)) {
-				connectionsFoundIds.push(connectionFound.source);
-			}
+	async function makeMessageByCodeAndDay(deviceCode, day) {
+		const stats = await app.dbUtil.stats(day);
+		if (stats.sources >= 256) {
+			return '\nВсе 📟устройства уже исследованы!'
 		}
 
-		let notFoundConnectionsIds = []
-		for (const id of connectedTargetIds) {
-			if (!connectionsFoundIds.includes(id)) {
-				notFoundConnectionsIds.push(id);
-			}
+		const device = await app.repository.device.getOneByCode(deviceCode);
+		const unvisited = await getBySourceIdAndDay(device.id, day);
+		if (unvisited.length == 0) {
+			return '\nНет 📟устройств для исследования поблизости.';
+		} 
+
+		let unvisitedMessage = '\nНеисследованные 📟устройства поблизости:';
+		for (let codes of unvisited) {
+			const cost = codes.length - 1;
+			const route = codes.join(' → ');
+			unvisitedMessage += `\n⚡${cost}: ${route}`;
 		}
 
-		let notFoundDevices = await app.repository.device.getAllByIds(notFoundConnectionsIds);
-
-		if (notFoundDevices == null || notFoundDevices.length == 0) {
-			return {
-				"all": connectionsFound,
-				"notFound": []
-			} 
-		}
-
-		let notFoundCodes = [];
-		for (const device of notFoundDevices) {
-			notFoundCodes.push(device.code);
-		}
-
-		return {
-			"all": connectionsFound,
-			"notFound": notFoundCodes
-		}
-
+		return unvisitedMessage;
 	}
 
 	async function getBySourceIdAndDay(sourceId, day) {
@@ -50,6 +33,71 @@ module.exports = function(app) {
 			return null;
 		}
 
-		return getByConnectionsAndDay(сonnections, day);
+		let result = [];
+		await recursiveSearch(8, 250, [sourceId], result, day);
+		result = sortByLength(result).slice(0, 5);
+		return transformIdsToCodes(result);
+	}
+
+	async function recursiveSearch(depth, maxCount, trace, result, day)
+	{
+		if (depth == 0 || result.length >= maxCount) {
+			return;
+		}
+
+		const currentDevice = trace[trace.length - 1];
+		const connections = await app.repository.connection.getAllBySourceAndDay(currentDevice, day);
+		if (connections.length == 0) {
+			result.push(trace);
+			return;
+		}
+
+		for (const connection of connections) {
+			await recursiveSearch(depth - 1, maxCount, trace.concat([connection.target]), result, day);
+		}
+	}
+
+	function sortByLength(ids) {
+		let pathsByLength = {};
+		for (let path of ids) {
+			const count = path.length;
+			if (typeof(pathsByLength[count]) == 'undefined') {
+				pathsByLength[count] = [];
+			}
+			pathsByLength[count].push(path);
+		}
+
+		const sortedKeys = Object.keys(pathsByLength).sort();
+		let returnable = [];
+		for (const key of sortedKeys) {
+			returnable = returnable.concat(pathsByLength[key]);
+		}
+
+		return returnable;
+	}
+
+	async function transformIdsToCodes(ids) {
+		let allIds = [];
+		for (const line of ids) {
+			for (const id of line) {
+				if (!allIds.includes(id)) {
+					allIds = allIds.concat(id);
+				}
+			}
+		}
+
+		let allCodes = await app.repository.device.getCodesByIds(allIds);
+
+		let codeLines = [];
+
+		for (const line of ids) {
+			let newLine = [];
+			for (const id of line) {
+				newLine.push(allCodes[id]);
+			}
+			codeLines.push(newLine);
+		}
+
+		return codeLines;
 	}
 }

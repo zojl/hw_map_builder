@@ -30,12 +30,7 @@ module.exports = function(app) {
 			return;
 		}
 
-		const level1Connections = await app.dbUtil.unvisited.getByConnectionsAndDay(deviceConnections, dates.day);
-		if (level1Connections.notFound.length > 0) {
-			ctx.reply('Это устройство связано со следующими неисследованными: ' + level1Connections.notFound.join(', '));
-			return;
-		}
-
-		ctx.reply('Не удалось найти ближайшие неисследованные устройства.');
+		const connectionMessage = await app.dbUtil.unvisited.makeMessageByCodeAndDay(deviceCode, dates.day);
+		ctx.reply(connectionMessage);
 	}
 }

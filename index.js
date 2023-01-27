@@ -53,9 +53,9 @@ app.getDates = function() {
   }
 }
 
-require('./app/messages/start.js')(app.bot, app.dbUtil, app.getDates);
-require('./app/messages/route.js')(app.bot, app.dbUtil, app.getDates);
-require('./app/messages/stats.js')(app.bot, app.dbUtil, app.getDates);
+require('./app/messages/start.js')(app);
+require('./app/messages/route.js')(app);
+require('./app/messages/stats.js')(app);
 require('./app/messages/analyse.js')(app);
 
 require('./app/messages/plain.js')(app);

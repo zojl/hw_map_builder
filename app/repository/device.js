@@ -68,7 +68,7 @@ module.exports = function(sequelize, models) {
 
 
     async function getCodesByIds(ids) {
-        const deviceEntities = getAllByIds(ids);
+        const deviceEntities = await getAllByIds(ids);
 
         let codesByIds = {};
         for (const device of deviceEntities) {
@@ -79,7 +79,7 @@ module.exports = function(sequelize, models) {
     }
 
     async function getIdsByCodes(codes) {
-        const deviceEntities = getAllByCodes(codes);
+        const deviceEntities = await getAllByCodes(codes);
 
         let idsByCodes = {};
         for (const device of deviceEntities) {
