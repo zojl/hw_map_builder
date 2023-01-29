@@ -57,7 +57,7 @@ module.exports = function(app) {
 			}
 			lastDevice = device;
 
-			if (process.env.IS_STATBOT_ENABLED == 'true') {
+			if (process.env.IS_STATBOT_ENABLED === 'true') {
 				try {
 					sendToStatBot(ctx.message.from_id, src.text, src.date);
 				} catch (error) {
@@ -148,7 +148,7 @@ module.exports = function(app) {
 				&& line.startsWith('📟')
 			) {
 				const deviceNumber = index - connectionsLine;
-				apiDTO.device_info['device' + deviceNumber] = parseInt(line.substring(line.length - 2), 16);
+                apiDTO.device_info.devices.push(parseInt(line.substring(line.length - 2), 16));
 			}
 		}
 
