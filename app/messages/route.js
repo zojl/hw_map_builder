@@ -26,13 +26,34 @@ module.exports = function(app) {
 
 	async function handleCommand(ctx) {
 		let dates = app.getDates();
-		const args = ctx.message.text.split(' ');
-		if (args.length <= 2) {
+        let targetFromReply = null;
+
+        if (
+            typeof(ctx.message.reply_message) !== 'undefined'
+            && typeof(ctx.message.reply_message.fwd_messages) === 'object'
+            && Array.isArray(ctx.message.reply_message.fwd_messages)
+            && ctx.message.reply_message.fwd_messages.length === 1
+            && ctx.message.reply_message.fwd_messages[0].from_id === parseInt(process.env.HW_BOT_ID)
+            && ctx.message.reply_message.fwd_messages[0].text.startsWith('Ты атаковал отслеживаемого пользователя')
+        ) {
+            const msgText = ctx.message.reply_message.fwd_messages[0].text;
+            targetFromReply = msgText.substring(msgText.length - 2);
+        }
+
+        const args = ctx.message.text.split(' ');
+		if (
+            args.length <= 2
+            && !(
+                args.length === 2
+                && targetFromReply !== null
+            )
+        ) {
 			ctx.reply('Укажи исходное и конечное устройство, например /route 00 FF');
 			return;
 		}
 
-		const result = await app.dbUtil.dijkstra(args[1], args[2], dates.day);
+        const target = targetFromReply !== null ? targetFromReply : args[2];
+        const result = await app.dbUtil.dijkstra(args[1], target, dates.day);
 		console.log(result);
 		if (result === null) {
 			ctx.reply('У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить такой маршрут.');

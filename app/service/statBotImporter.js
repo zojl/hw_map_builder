@@ -25,6 +25,10 @@ module.exports = function(app) {
 				rawBody += chunk; 
 			});
 
+            response.on('error', (e) => {
+                app.sentry.captureException(e);
+            })
+
 			response.on('end', async () => {
 				const responseText = rawBody.toString();
 
@@ -34,7 +38,7 @@ module.exports = function(app) {
 				}
 
 				const responseHash = md5(responseText);
-				if (responseHash == lasfUpdateHash) {
+				if (responseHash === lasfUpdateHash) {
 					return;
 				}
 

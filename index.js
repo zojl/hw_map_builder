@@ -1,8 +1,17 @@
 require('dotenv').config()
 const VkBot = require('node-vk-bot-api');
 const Sequelize = require('sequelize');
+const Sentry = require("@sentry/browser");
+const {BrowserTracing} = require("@sentry/tracing");
+
+Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [new BrowserTracing()],
+    tracesSampleRate: 1.0,
+});
 
 let app = {};
+app.sentry = Sentry;
 app.bot = new VkBot(process.env.TOKEN);
 app.db = new Sequelize(process.env.DB, {logging: process.env.ENV.toLowerCase() === 'dev'});
 
@@ -71,8 +80,13 @@ app.bot.use(async (ctx, next) => {
   }
 });
 
-app.bot.startPolling((err) => {
-  if (err) {
-    console.error(err);
-  }
-});
+function reInitPolling() {
+    app.bot.startPolling((err) => {
+        if (err) {
+            app.sentry.captureException(err);
+            console.error(err);
+            reInitPolling();
+        }
+    });
+}
+reInitPolling();
