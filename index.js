@@ -21,9 +21,8 @@ app.model.devices = require('./app/model/devices.js')(app.db, Sequelize);
 app.model.devices.sync();
 app.model.connections = require('./app/model/connections.js')(app.db, Sequelize);
 app.model.connections.sync();
-app.models = app.model; //todo убрать
-app.db.query("CREATE EXTENSION PostGIS;");
-app.db.query("CREATE EXTENSION pgRouting;");
+app.db.query("CREATE EXTENSION IF NOT EXISTS PostGIS;");
+app.db.query("CREATE EXTENSION IF NOT EXISTS pgRouting;");
 
 app.repository = {};
 app.repository.connection = require('./app/repository/connection.js')(app.db, app.model);
@@ -49,7 +48,7 @@ app.getDates = function() {
   if (now.getHours() < 18) {
     day--;
 
-    if (dayOfMonth == 1) {
+    if (dayOfMonth === 1) {
       dayOfMonth = -1;
     } else {
       dayOfMonth--;
@@ -69,7 +68,7 @@ require('./app/messages/analyse.js')(app);
 
 require('./app/messages/plain.js')(app);
 
-app.service.statBotImporter.initImport(2.5 * 60 * 1000);
+app.service.statBotImporter.initImport(60 * 1000);
 console.info('bot started');
 
 app.bot.use(async (ctx, next) => {
@@ -80,13 +79,14 @@ app.bot.use(async (ctx, next) => {
   }
 });
 
-function reInitPolling() {
+function initPolling() {
     app.bot.startPolling((err) => {
         if (err) {
             app.sentry.captureException(err);
             console.error(err);
-            reInitPolling();
+            app.bot.stop();
+            initPolling();
         }
     });
 }
-reInitPolling();
+initPolling();
