@@ -4,14 +4,14 @@ module.exports = function(app) {
 		getBySourceIdAndDay
 	}
 
-	async function makeMessageByCodeAndDay(deviceCode, day) {
-		const stats = await app.dbUtil.stats(day);
+	async function makeMessageByCodeAndDay(deviceCode, day, subnetId) {
+		const stats = await app.dbUtil.stats(day, subnetId);
 		if (stats.sources >= 256) {
 			return '\nВсе 📟устройства уже исследованы!'
 		}
 
 		const device = await app.repository.device.getOneByCode(deviceCode);
-		const unvisited = await getBySourceIdAndDay(device.id, day);
+		const unvisited = await getBySourceIdAndDay(device.id, day, subnetId);
 		if (unvisited.length == 0) {
 			return '\nНет 📟устройств для исследования поблизости.';
 		} 
@@ -26,34 +26,34 @@ module.exports = function(app) {
 		return unvisitedMessage;
 	}
 
-	async function getBySourceIdAndDay(sourceId, day) {
-		const сonnections = await app.repository.connection.getAllBySourceAndDay(sourceId, day);
+	async function getBySourceIdAndDay(sourceId, day, subnetId) {
+		const сonnections = await app.repository.connection.getAllBySourceDayAndSubnet(sourceId, day, subnetId);
 
 		if (сonnections.length == 0) {
 			return null;
 		}
 
 		let result = [];
-		await recursiveSearch(8, 250, [sourceId], result, day);
+		await recursiveSearch(8, 250, [sourceId], result, day, subnetId);
 		result = sortByLength(result).slice(0, 5);
 		return transformIdsToCodes(result);
 	}
 
-	async function recursiveSearch(depth, maxCount, trace, result, day)
+	async function recursiveSearch(depth, maxCount, trace, result, day, subnetId)
 	{
 		if (depth == 0 || result.length >= maxCount) {
 			return;
 		}
 
 		const currentDevice = trace[trace.length - 1];
-		const connections = await app.repository.connection.getAllBySourceAndDay(currentDevice, day);
+		const connections = await app.repository.connection.getAllBySourceDayAndSubnet(currentDevice, day, subnetId);
 		if (connections.length == 0) {
 			result.push(trace);
 			return;
 		}
 
 		for (const connection of connections) {
-			await recursiveSearch(depth - 1, maxCount, trace.concat([connection.target]), result, day);
+			await recursiveSearch(depth - 1, maxCount, trace.concat([connection.target]), result, day, subnetId);
 		}
 	}
 

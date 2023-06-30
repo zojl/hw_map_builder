@@ -20,6 +20,9 @@ module.exports = function(sequelize, DataTypes) {
     reverseCost: {
       type: DataTypes.INTEGER(),
     },
+    subnet: {
+      type: DataTypes.INTEGER(),
+    },
     day: {
       type: DataTypes.INTEGER(),
       allowNull: false

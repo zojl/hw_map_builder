@@ -8,6 +8,18 @@ module.exports = function(app) {
 	})
 
 	async function handleCommand(ctx) {
+		const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
+		if (chat === null) {
+			ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте.');
+			return;
+		}
+
+		const subnet = await app.repository.subnet.getOneById(chat.subnet);
+		if (subnet === null) {
+			ctx.reply('Ошибка подбора подсети, обратитесь в техподдержку');
+			return;
+		}
+
 		let dates = app.getDates();
 
 		const args = ctx.message.text.split(' ');
@@ -23,14 +35,14 @@ module.exports = function(app) {
 			return;
 		}
 
-		const deviceConnections = await app.repository.connection.getAllBySourceAndDay(sourceDeviceEntity.id, dates.day)
+		const deviceConnections = await app.repository.connection.getAllBySourceDayAndSubnet(sourceDeviceEntity.id, dates.day, subnet.id)
 
 		if (deviceConnections.length == 0) {
 			ctx.reply('Этого устройства нет на сегодняшней карте. Перешли сообщение с его связями, если посещал его.');
 			return;
 		}
 
-		const connectionMessage = await app.dbUtil.unvisited.makeMessageByCodeAndDay(deviceCode, dates.day);
+		const connectionMessage = await app.dbUtil.unvisited.makeMessageByCodeAndDay(deviceCode, dates.day, subnet.id);
 		ctx.reply(connectionMessage);
 	}
 }

@@ -38,7 +38,17 @@ module.exports = function (app) {
         const {lastDevice, replies} = await handleConnectionMessages(connectionMessages, dates.day, msg.from_id);
 
         if (lastDevice !== null) {
-            let unvisitedMessage = await app.dbUtil.unvisited.makeMessageByCodeAndDay(lastDevice, dates.day);
+            console.log(lastDevice);
+
+            subnetCode = lastDevice.substr(0, 6);
+            let subnet = await app.repository.subnet.getOneByCode(subnetCode);
+
+            if(subnet === null) {
+                ctx.reply('Спасибо!\n' + replies.join('\n') + 'Данное устройство находится в неизвестной подсети.');
+                return
+            }
+
+            let unvisitedMessage = await app.dbUtil.unvisited.makeMessageByCodeAndDay(lastDevice, dates.day, subnet.id);
             ctx.reply('Спасибо!\n' + replies.join('\n') + unvisitedMessage);
             return;
         }
@@ -94,6 +104,7 @@ module.exports = function (app) {
                 replies.push('Устройство 📟' + device + ' отмечено как связанное с 📟' + connections.join(', 📟'));
             }
             lastDevice = device;
+
 
             if (process.env.IS_VHINFO_ENABLED === 'true') {
                 try {
@@ -180,7 +191,7 @@ module.exports = function (app) {
                 && line.startsWith('📟')
             ) {
                 const deviceNumber = index - connectionsLine;
-                apiDTO.device_info.devices.push(parseInt(line.substring(line.length - 2), 16));
+                apiDTO.device_info.devices.push(parseInt(line.substring(line.length - 8), 16));
             }
         }
 
@@ -197,9 +208,9 @@ module.exports = function (app) {
         }
 
         const parts = message.text.split(' ');
-        const bossName = parts[4] + ' ' + parts[5];
+        let bossName = parts[4] + ' ' + parts[5];
         if (bossName.includes("\n")) {
-            bossName = bossName.text.split("\n")[0];
+            bossName = bossName.split("\n")[0];
         }
         const bossLocation = message.text.substring(message.text.length - 8);
 

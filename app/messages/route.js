@@ -25,6 +25,18 @@ module.exports = function(app) {
 	})
 
 	async function handleCommand(ctx) {
+		const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
+		if (chat === null) {
+			ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте.');
+			return;
+		}
+
+		const subnet = await app.repository.subnet.getOneById(chat.subnet);
+		if (subnet === null) {
+			ctx.reply('Ошибка подбора подсети, обратитесь в техподдержку');
+			return;
+		}
+
 		let dates = app.getDates();
         let targetFromReply = null;
 
@@ -53,7 +65,7 @@ module.exports = function(app) {
 		}
 
         const target = targetFromReply !== null ? targetFromReply : args[2];
-        const result = await app.dbUtil.dijkstra(args[1], target, dates.day);
+        const result = await app.dbUtil.dijkstra(args[1], target, dates.day, subnet.id);
 		console.log(result);
 		if (result === null) {
 			ctx.reply('У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить такой маршрут.');

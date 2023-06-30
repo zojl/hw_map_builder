@@ -27,12 +27,18 @@ app.model.devices = require('./app/model/devices.js')(app.db, Sequelize);
 app.model.devices.sync();
 app.model.connections = require('./app/model/connections.js')(app.db, Sequelize);
 app.model.connections.sync();
+app.model.subnets = require('./app/model/subnets.js')(app.db, Sequelize);
+app.model.subnets.sync();
+app.model.chats = require('./app/model/chats.js')(app.db, Sequelize);
+app.model.chats.sync();
 app.db.query("CREATE EXTENSION IF NOT EXISTS PostGIS;");
 app.db.query("CREATE EXTENSION IF NOT EXISTS pgRouting;");
 
 app.repository = {};
 app.repository.connection = require('./app/repository/connection.js')(app.db, app.model);
 app.repository.device = require('./app/repository/device.js')(app.db, app.model);
+app.repository.subnet = require('./app/repository/subnet.js')(app.db, app.model);
+app.repository.chat = require('./app/repository/chat.js')(app.db, app.model);
 
 app.dbUtil = {};
 app.dbUtil.pushToDB = require('./app/dbUtil/dbPusher.js')(app.db, app.model);
@@ -71,6 +77,7 @@ require('./app/messages/start.js')(app);
 require('./app/messages/route.js')(app);
 require('./app/messages/stats.js')(app);
 require('./app/messages/analyse.js')(app);
+require('./app/messages/chat.js')(app);
 
 require('./app/messages/plain.js')(app);
 

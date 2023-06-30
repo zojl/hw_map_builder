@@ -1,15 +1,16 @@
 module.exports = function(sequelize, models) {
     return {
         getAllByTargetAndDay,
-        getAllBySourceAndDay,
+        getAllBySourceDayAndSubnet,
         getOneBySourceTargetAndDay
     }
 
-    async function getAllBySourceAndDay(sourceId, day) {
+    async function getAllBySourceDayAndSubnet(sourceId, day, subnetId) {
         let connectionEntities = await models.connections.findAll({
             where: {
                 source: sourceId,
-                day: day
+                day: day,
+                subnet: subnetId
             }
         });
 
