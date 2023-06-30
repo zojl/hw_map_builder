@@ -14,7 +14,7 @@ module.exports = function (app) {
         const updateTimeStamp = updateTime.getTime() / 1000;
 
         let connectionMessages = [];
-        let hitMessage = '';
+        let hitMessage = null;
 
         for (const src of msg.fwd_messages) {
             if (src.from_id !== parseInt(process.env.HW_BOT_ID)) {
@@ -43,8 +43,8 @@ module.exports = function (app) {
             return;
         }
 
-        if (hitMessage !== null) {
-            sendHitToStatbot(hitMessage);
+        if (hitMessage !== null && process.env.IS_VHINFO_ENABLED === 'true') {
+            sendHitToVhackInfo(hitMessage);
             return;
         }
 
@@ -95,9 +95,9 @@ module.exports = function (app) {
             }
             lastDevice = device;
 
-            if (process.env.IS_STATBOT_ENABLED === 'true') {
+            if (process.env.IS_VHINFO_ENABLED === 'true') {
                 try {
-                    sendDevicesToStatBot(from, message, src.date);
+                    sendDevicesToVhackInfo(from, message, src.date);
                 } catch (error) {
                     app.sentry.captureException(error);
                     console.error(error);
@@ -111,7 +111,7 @@ module.exports = function (app) {
         }
     }
 
-    function sendDevicesToStatBot(userId, message, timestamp) {
+    function sendDevicesToVhackInfo(userId, message, timestamp) {
         let apiDTO = extend({}, app.service.vHackApi.getDeviceDTO());
         apiDTO.ident = userId;
         apiDTO.timestamp = timestamp;
@@ -123,7 +123,7 @@ module.exports = function (app) {
             const lineComponents = line.split(' ');
 
             if (line.startsWith('📟Устройство: ')) {
-                apiDTO.device_info.device = parseInt(line.substring(line.length - 2), 16);
+                apiDTO.device_info.device = parseInt(line.substring(line.length - 8), 16);
             }
 
             if (line.startsWith('👥Союзники: ')) {
@@ -187,7 +187,7 @@ module.exports = function (app) {
         app.service.vHackApi.sendDevice(apiDTO);
     }
 
-    function sendHitToStatbot(message) {
+    function sendHitToVhackInfo(message) {
         let apiDTO = {...app.service.vHackApi.getNpcDto()};
         apiDTO.ident = message.from_id;
         apiDTO.timestamp = message.date;
@@ -198,7 +198,10 @@ module.exports = function (app) {
 
         const parts = message.text.split(' ');
         const bossName = parts[4] + ' ' + parts[5];
-        const bossLocation = message.text.substring(message.text.length - 2);
+        if (bossName.includes("\n")) {
+            bossName = bossName.text.split("\n")[0];
+        }
+        const bossLocation = message.text.substring(message.text.length - 8);
 
         apiDTO.npc_info.device = parseInt(bossLocation, 16);
         apiDTO.npc_info.name = bossName;

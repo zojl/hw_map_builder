@@ -1,4 +1,6 @@
 require('dotenv').config()
+const express = require('express');
+const bodyParser = require('body-parser');
 const VkBot = require('node-vk-bot-api');
 const Sequelize = require('sequelize');
 const Sentry = require("@sentry/browser");
@@ -12,7 +14,11 @@ Sentry.init({
 
 let app = {};
 app.sentry = Sentry;
-app.bot = new VkBot(process.env.TOKEN);
+app.http = express();
+app.bot = new VkBot({
+  token: process.env.TOKEN,
+  confirmation: process.env.CONFIRMATION
+});
 app.db = new Sequelize(process.env.DB, {logging: process.env.ENV.toLowerCase() === 'dev'});
 
 app.db.Op = Sequelize.Op;
@@ -68,8 +74,9 @@ require('./app/messages/analyse.js')(app);
 
 require('./app/messages/plain.js')(app);
 
-app.service.statBotImporter.initImport(60 * 1000);
-console.info('bot started');
+if (process.env.IS_STATBOT_ENABLED === 'true') {
+  app.service.statBotImporter.initImport(60 * 1000);
+}
 
 app.bot.use(async (ctx, next) => {
   try {
@@ -79,14 +86,8 @@ app.bot.use(async (ctx, next) => {
   }
 });
 
-function initPolling() {
-    app.bot.startPolling((err) => {
-        if (err) {
-            app.sentry.captureException(err);
-            console.error(err);
-            app.bot.stop();
-            initPolling();
-        }
-    });
-}
-initPolling();
+app.http.use(bodyParser.json());
+app.http.post('/', app.bot.webhookCallback);
+app.http.listen(process.env.PORT);
+
+console.info('bot started');

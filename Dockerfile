@@ -5,3 +5,4 @@ WORKDIR /bot
 COPY ./ /bot/
 RUN npm install
 CMD node --trace-warnings index.js
+
