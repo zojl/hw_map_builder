@@ -197,9 +197,9 @@ module.exports = function (app) {
         }
 
         const parts = message.text.split(' ');
-        const bossName = parts[4] + ' ' + parts[5];
+        let bossName = parts[4] + ' ' + parts[5];
         if (bossName.includes("\n")) {
-            bossName = bossName.text.split("\n")[0];
+            bossName = bossName.split("\n")[0];
         }
         const bossLocation = message.text.substring(message.text.length - 8);
 
