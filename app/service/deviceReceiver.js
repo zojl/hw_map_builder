@@ -58,8 +58,6 @@ module.exports = function(app) {
             );
             console.log(`Received from VI users ${users.join(',')} at ${sourceDevice}`)
         }
-        //docker compose build hwmap-builder && docker compose up hwmap-builder -d && docker compose logs hwmap-builder -f
-
         res.json({"status": "OK"});
     }
     

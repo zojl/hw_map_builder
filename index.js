@@ -136,3 +136,6 @@ console.info('bot started as callback at ' + process.env.PORT);
 if (process.env.INCOMING_DEVICES_PORT != '') {
   require('./app/service/deviceReceiver.js')(app);
 }
+
+//restart instruction for developer:
+//docker compose build hwmap-builder && docker compose up hwmap-builder -d && docker compose logs hwmap-builder -f
