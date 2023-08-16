@@ -4,8 +4,8 @@ module.exports = function(app) {
 	let lasfUpdateHash = null;
 	let timerId = null;
 
-	const url = process.env.STATBOT_HOST + '/api/v1/event/server-map/';
-	const options = {'User-Agent': 'c0nd0rs_map_builder/1.0'};
+	const url = process.env.STATBOT_HOST + '/server/map/';
+	const options = {'User-Agent': 'c0nd0rs_map_builder/1.0', 'Authorization': process.env.STATBOT_AUTH_TOKEN};
 
 	return {
 		updateMap,
@@ -53,7 +53,15 @@ module.exports = function(app) {
 				}
 
 				for (const mapConnection of map.data) {
-					const addResult = await app.dbUtil.pushToDB(mapConnection.from, mapConnection.to, dates.day);
+					let connectionsTo = [];
+					for (target of mapConnection.to) {
+						connectionsTo.push(target.match(/[a-fA-F0-9]{8}/)[0]);
+					}
+					const addResult = await app.dbUtil.dbPusher.pushConnections(
+						mapConnection.from.match(/[a-fA-F0-9]{8}/)[0],
+						connectionsTo,
+						dates.day
+					);
 					if (addResult) {
 						addedCounter++;
 					}

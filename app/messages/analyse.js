@@ -8,18 +8,7 @@ module.exports = function(app) {
 	})
 
 	async function handleCommand(ctx) {
-		const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
-		if (chat === null) {
-			ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте.');
-			return;
-		}
-
-		const subnet = await app.repository.subnet.getOneById(chat.subnet);
-		if (subnet === null) {
-			ctx.reply('Ошибка подбора подсети, обратитесь в техподдержку');
-			return;
-		}
-
+		const subnet = await app.getSubnetFromMessage(ctx);
 		let dates = app.getDates();
 
 		const args = ctx.message.text.split(' ');

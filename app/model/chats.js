@@ -1,4 +1,4 @@
-module.exports = function(sequelize, DataTypes, ) {
+module.exports = function(sequelize, DataTypes) {
     return sequelize.define('chats', {
         id: {
             type: DataTypes.INTEGER(),
@@ -14,6 +14,18 @@ module.exports = function(sequelize, DataTypes, ) {
         subnet: {
             type: DataTypes.INTEGER(),
             allowNull: false,
+        },
+        delimiter: {
+            type: DataTypes.STRING(8),
+            allowNull: true,
+        },
+        canSeeNpc: {
+            type: DataTypes.BOOLEAN(),
+            allowNull: true,
+        },
+        comment: {
+            type: DataTypes.STRING(256),
+            allowNull: true,
         },
     }, {
         tableName: 'chats'

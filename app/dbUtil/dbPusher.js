@@ -39,6 +39,23 @@ module.exports = function(sequelize, models) {
     return deviceEntity;
   }
 
+  async function findOrCreateNpc(username) {
+    let npc = await models.npcs.findOne({
+      where: {
+        name: username
+      }
+    });
+
+    if (npc !== null) {
+      return npc;
+    }
+
+    npcEntity = await models.npcs.create({
+      name: username
+    })
+    return npcEntity;
+  }
+
   async function createConnection(source, target, day, subnetId) {
     let connectionEntity = await models.connections.findOne({
       where: {
@@ -65,5 +82,37 @@ module.exports = function(sequelize, models) {
     return true;
   }
 
-  return pushToDB;
+  const pushUsers = async function(users, deviceFull, messageDate, vkUser, isHit) {
+    const subnetCode = deviceFull.substr(0, 6);
+    const deviceCode = deviceFull.substr(deviceFull.length - 2, 2);
+
+    let subnet = await models.subnets.findOne({
+      where: {
+        code: subnetCode
+      }
+    });
+
+    if(subnet === null) {
+      return false
+    }
+
+    const device = await findOrCreateDevice(deviceFull);
+
+    for (user of users) {
+      const npc = await findOrCreateNpc(user);
+      let npcLocation = await models.npcLocations.create({
+        npc: npc.id,
+        device: device.id,
+        subnet: subnet.id,
+        messageDate: messageDate,
+        vkUser: vkUser,
+        isHit: isHit,
+      });
+    }
+  }
+
+  return {
+    pushConnections: pushToDB,
+    pushUsers,
+  };
 };

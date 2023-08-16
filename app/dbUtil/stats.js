@@ -17,9 +17,18 @@ module.exports = function(sequelize, models) {
 			}
 		});
 
+		const countConnections = await models.connections.count({
+			col: 'connections',
+			where: {
+				day: day,
+				subnet: subnetId,
+			}
+		});
+
 		return {
 			"sources": countSources,
-			"targets": countTargets
+			"targets": countTargets,
+			"connections": countConnections,
 		}
 	}
 

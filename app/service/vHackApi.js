@@ -15,10 +15,12 @@ module.exports =
                 "token": null, //токен клиента
                 "ident": null, //идентификатор пользователя
                 "timestamp": null,
-                "transit": [
-                    "alliance", //пересылать в чат фракции
-                    "statbot", //пересылать в статбота
-                    "map" //добавлять на интерактивную карту
+                "transit": [ //куда пересылать
+                    "alliance", //чат союза
+                    "statbot", //статбот
+                    "map", //интерактивная карта
+                    "underbot", //"недо-бот" NK
+                    "nhsmap", //бот НХС
                 ],
                 "no_transit": [] //кому не пересылать
             }
@@ -94,6 +96,10 @@ module.exports =
             data.ident = 'chinamap / ' + data.ident;
 
             const requestData = JSON.stringify(data);
+
+            if (process.env.ENV === 'dev') {
+                console.debug(requestData);
+            }
             const options = {
                 method: 'POST',
                 headers: {

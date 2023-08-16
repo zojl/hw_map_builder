@@ -1,16 +1,16 @@
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('devices', {
+  return sequelize.define('npcs', {
     id: {
       type: DataTypes.INTEGER(),
       allowNull: false,
       primaryKey: true,
       autoIncrement: true
     },
-    code: {
-      type: DataTypes.STRING(2),
+    name: {
+      type: DataTypes.STRING(32),
       allowNull: false,
     },  
   }, {
-    tableName: 'devices'
+    tableName: 'npcs'
   });
 };

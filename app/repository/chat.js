@@ -4,9 +4,9 @@ module.exports = function(sequelize, models) {
     }
 
     async function getOneByPeerId(peerId) {
-        if (peerId <= 2000000000) {
+        /*if (peerId <= 2000000000) {
             return null;
-        }
+        }*/
         
         let chat = await models.chats.findOne({
             where: {

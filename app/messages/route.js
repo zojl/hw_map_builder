@@ -1,41 +1,56 @@
 module.exports = function(app) {
-	app.bot.command('/r', (ctx) => {
+	app.bot.command('/r ', (ctx) => {
 		handleCommand(ctx);
 	})
 
-	app.bot.command('/p', (ctx) => {
+	app.bot.command('/p ', (ctx) => {
 		handleCommand(ctx);
 	})
 
-	app.bot.command('/w', (ctx) => {
+	app.bot.command('/w ', (ctx) => {
 		handleCommand(ctx);
 	})
 
-	app.bot.command('/route', (ctx) => {
+	app.bot.command('/route ', (ctx) => {
 		handleCommand(ctx);
 	})
 
 
-	app.bot.command('/path', (ctx) => {
+	app.bot.command('/path ', (ctx) => {
 		handleCommand(ctx);
 	})
 
-	app.bot.command('/way', (ctx) => {
+	app.bot.command('/way ', (ctx) => {
 		handleCommand(ctx);
+	})
+
+	app.bot.command('/wg ', (ctx) => {
+		handleRouteGroup(ctx);
+	})
+
+	app.bot.command('/rg ', (ctx) => {
+		handleRouteGroup(ctx);
+	})
+
+	app.bot.command('/pg ', (ctx) => {
+		handleRouteGroup(ctx);
+	})
+
+	app.bot.command('/routegroup ', (ctx) => {
+		handleRouteGroup(ctx);
+	})
+
+	app.bot.command('/pathgroup ', (ctx) => {
+		handleRouteGroup(ctx);
+	})
+
+	app.bot.command('/waygroup ', (ctx) => {
+		handleRouteGroup(ctx);
 	})
 
 	async function handleCommand(ctx) {
-		const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
-		if (chat === null) {
-			ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте.');
-			return;
-		}
-
-		const subnet = await app.repository.subnet.getOneById(chat.subnet);
-		if (subnet === null) {
-			ctx.reply('Ошибка подбора подсети, обратитесь в техподдержку');
-			return;
-		}
+		const chat = await app.getChatFromMessage(ctx);
+		const subnet = await app.getSubnetFromChat(chat);
 
 		let dates = app.getDates();
         let targetFromReply = null;
@@ -73,7 +88,53 @@ module.exports = function(app) {
 		}
 
 		const cost = result.length - 1;
-		const route = result.join(' → ');
+		const delimiter = chat.delimiter ? chat.delimiter : ' → ';
+		const route = result.join(delimiter);
 		ctx.reply(`⚡${cost}: ${route}`);
+	}
+
+	async function handleRouteGroup(ctx) {
+		const chat = await app.getChatFromMessage(ctx);
+		const subnet = await app.getSubnetFromChat(chat);
+		let dates = app.getDates();
+
+		const args = ctx.message.text.split(' ');
+		if (args.length < 4) {
+			ctx.reply('Укажи исходное устройство и список конечных, например /route 00 AA BB CC DD, где 00 — исходное');
+			return;
+		}
+
+		let routes = [];
+		let usedDevices = [];
+		const delimiter = chat.delimiter ? chat.delimiter : ' → ';
+		for (const targetNum in args) {
+			if (targetNum < 2) {
+				continue;
+			}
+
+			const target = args[targetNum];
+			if (parseInt(target, 16) > 255) {
+				continue;
+			}
+
+			if (usedDevices.includes(target.toUpperCase())) {
+				continue;
+			}
+
+			const route = await app.dbUtil.dijkstra(args[1], target, dates.day, subnet.id);
+			if (route !== null) {
+				const cost = route.length - 1;
+				const routeReadable = route.join(delimiter);
+				routes.push(`⚡${cost}: ${routeReadable}`);
+				usedDevices.push(target.toUpperCase());
+			}
+		}
+
+		if (routes.length == 0) {
+			ctx.reply('Мне не удалось построить путь ни до одного из перечисленных устройств.');
+			return;
+		}
+
+		ctx.reply("Известные пути до указанных устройств:\n" + routes.join("\n"));
 	}
 }

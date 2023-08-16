@@ -54,7 +54,8 @@ module.exports = function (app) {
         }
 
         if (hitMessage !== null && process.env.IS_VHINFO_ENABLED === 'true') {
-            sendHitToVhackInfo(hitMessage);
+            const reply = await handleHitMessage(hitMessage, dates.day, msg.from_id);
+            ctx.reply(reply);
             return;
         }
 
@@ -83,27 +84,51 @@ module.exports = function (app) {
             const lines = message.split('\n');
             let device = lines[0].substring(lines[0].length - 8);
             let connections = [];
+            let users = [];
             let foundConnection = false;
+            let foundUsers = false;
             for (const line of lines) {
                 if (foundConnection) {
                     if (line.startsWith('📟') && connections.length < 3) {
-                        connections.push(line.substring(2));
-                    }
+                        connections.push(line.substring(2,10));
 
-                    continue;
+                        continue;
+                    }
+                }
+
+                if (foundUsers) {
+                    if (
+                        line.startsWith('🎯💣')
+                        || line.startsWith('⚔💣')
+                        || line.startsWith('⚖')
+                        || line.startsWith('👀')
+                    ) {
+                        users.push(line);
+                        continue;
+                    }
                 }
 
                 if (line === '🌐Подключения:') {
                     foundConnection = true;
                 }
+
+                if (line === '📍Пользователи:') {
+                    foundUsers = true;
+                }
             }
 
-            const result = await app.dbUtil.pushToDB(device, connections, day);
+            const result = await app.dbUtil.dbPusher.pushConnections(device, connections, day);
             if (result) {
                 console.log('added ' + device + ' linked to ' + connections.join(' '));
                 replies.push('Устройство 📟' + device + ' отмечено как связанное с 📟' + connections.join(', 📟'));
             }
             lastDevice = device;
+
+            if (users.length > 0) {
+                await app.dbUtil.dbPusher.pushUsers(users, device, src.date * 1000, from, false);
+                const msgUserPlural = (users.length === 1) ? 'пользователя' : 'пользователей';
+                replies.push(`Координаты ${msgUserPlural} ${users.join(', ')} сохранены`);
+            }
 
 
             if (process.env.IS_VHINFO_ENABLED === 'true') {
@@ -122,7 +147,26 @@ module.exports = function (app) {
         }
     }
 
-    function sendDevicesToVhackInfo(userId, message, timestamp) {
+    async function handleHitMessage(hitMessage, day, vkUserId) {
+        message = hitMessage.text;
+        if (!message.startsWith('Ты атаковал отслеживаемого пользователя')) {
+            return;
+        }
+
+        const lines = message.split("\n");
+        const userLine = lines[0].split(' ');
+        const userName = `🎯${userLine[userLine.length - 2]} ${userLine[userLine.length - 1]}`;
+
+        const deviceLine = lines[lines.length - 1].split('📟');
+        const device = deviceLine[deviceLine.length - 1];
+
+        await app.dbUtil.dbPusher.pushUsers([userName], device, hitMessage.date * 1000, vkUserId, true);
+
+        sendHitToVhackInfo(hitMessage);
+        return `Координаты пользователя ${userName} сохранены`;
+    }
+
+    async function sendDevicesToVhackInfo(userId, message, timestamp) {
         let apiDTO = extend({}, app.service.vHackApi.getDeviceDTO());
         apiDTO.ident = userId;
         apiDTO.timestamp = timestamp;
@@ -156,6 +200,7 @@ module.exports = function (app) {
             if (
                 line.startsWith('⚖💣')
                 || line.startsWith('⚖🔸')
+                || line.startsWith('⚖🔺')
             ) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('⚖'.length),
@@ -190,15 +235,14 @@ module.exports = function (app) {
                 && index <= parseInt(connectionsLine) + 3
                 && line.startsWith('📟')
             ) {
-                const deviceNumber = index - connectionsLine;
-                apiDTO.device_info.devices.push(parseInt(line.substring(line.length - 8), 16));
+                apiDTO.device_info.devices.push(parseInt(line.match(/[A-F0-9]{8}/)[0], 16));
             }
         }
 
         app.service.vHackApi.sendDevice(apiDTO);
     }
 
-    function sendHitToVhackInfo(message) {
+    async function sendHitToVhackInfo(message) {
         let apiDTO = {...app.service.vHackApi.getNpcDto()};
         apiDTO.ident = message.from_id;
         apiDTO.timestamp = message.date;
