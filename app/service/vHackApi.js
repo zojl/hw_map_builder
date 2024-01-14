@@ -20,7 +20,7 @@ module.exports =
                     "statbot", //статбот
                     "map", //интерактивная карта
                     "underbot", //"недо-бот" NK
-                    "nhsmap", //бот НХС
+                    //"nhsmap", //бот НХС
                 ],
                 "no_transit": [] //кому не пересылать
             }
@@ -83,6 +83,10 @@ module.exports =
         }
 
         function sendDevice(dto) {
+            if (process.env.IS_DUMP_VHINFO_OUT === 'true') {
+                console.log(dto);
+            }
+            
             send(dto, '/api/network/device');
         }
 

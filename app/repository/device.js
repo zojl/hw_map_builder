@@ -5,7 +5,8 @@ module.exports = function(sequelize, models) {
         getAllByIds,
         getAllByCodes,
         getCodesByIds,
-        getIdsByCodes
+        getIdsByCodes,
+        findAllUnconnected,
     }
 
     async function getOneById(id) {
@@ -87,5 +88,17 @@ module.exports = function(sequelize, models) {
         }
 
         return idsByCodes;
+    }
+
+    async function findAllUnconnected(day, subnetId) {
+        const devices = await models.devices.findAll({
+            where: sequelize.literal(`(SELECT COUNT(*) FROM connections WHERE subnet = ${subnetId} AND day = ${day} AND source = devices.id) = 0`)
+        });
+
+        if (devices === null || devices.length === 0) {
+            return null;
+        }
+
+        return devices;
     }
 };

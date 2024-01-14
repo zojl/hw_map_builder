@@ -50,6 +50,9 @@ module.exports = function(app) {
 
 	async function handleCommand(ctx) {
 		const chat = await app.getChatFromMessage(ctx);
+		if (chat === null) {
+			return;
+		}
 		const subnet = await app.getSubnetFromChat(chat);
 
 		let dates = app.getDates();
@@ -80,8 +83,11 @@ module.exports = function(app) {
 		}
 
         const target = targetFromReply !== null ? targetFromReply : args[2];
-        const result = await app.dbUtil.dijkstra(args[1], target, dates.day, subnet.id);
-		console.log(result);
+		const result = await app.dbUtil.dijkstra.getRoute(args[1], target, dates.day, subnet.id);
+		console.log([
+			ctx.message.from_id,
+			result
+		]);
 		if (result === null) {
 			ctx.reply('У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить такой маршрут.');
 			return;
@@ -95,6 +101,9 @@ module.exports = function(app) {
 
 	async function handleRouteGroup(ctx) {
 		const chat = await app.getChatFromMessage(ctx);
+		if (chat === null) {
+			return;
+		}
 		const subnet = await app.getSubnetFromChat(chat);
 		let dates = app.getDates();
 
@@ -121,7 +130,7 @@ module.exports = function(app) {
 				continue;
 			}
 
-			const route = await app.dbUtil.dijkstra(args[1], target, dates.day, subnet.id);
+			const route = await app.dbUtil.dijkstra.getRoute(args[1], target, dates.day, subnet.id);
 			if (route !== null) {
 				const cost = route.length - 1;
 				const routeReadable = route.join(delimiter);

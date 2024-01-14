@@ -10,8 +10,8 @@ module.exports = function(app) {
 			+ formatCount(stats.sources, subnet.length)
 			+ "\n Целевых устройств: "
 			+ formatCount(stats.targets, subnet.length)
-			+ "\n Связей в сети: "
-		    + formatCount(stats.connections, subnet.length * linkToDeviceCount)
+			//+ "\n Связей в сети: "
+		    //+ formatCount(stats.connections, subnet.length * linkToDeviceCount)
 		;
 		ctx.reply(reply);
 	});

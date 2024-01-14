@@ -13,6 +13,9 @@ module.exports = function(app) {
 
     const handleCycles = async (ctx) => {
         const chat = await app.getChatFromMessage(ctx);
+        if (chat === null) {
+            return;
+        }
         const subnet = await app.getSubnetFromChat(chat);
 
         const args = ctx.message.text.split(' ');
@@ -47,7 +50,7 @@ module.exports = function(app) {
         const delimiter = chat.delimiter ? chat.delimiter : ' → ';
         for (const connection of connections) {
             const target = await app.repository.device.getOneById(connection.target);
-            const cycle = await app.dbUtil.dijkstra(target.code, args[1], dates.day, subnet.id);
+            const cycle = await app.dbUtil.dijkstra.getRoute(target.code, args[1], dates.day, subnet.id);
             if (cycle === null) {
                 continue;
             }

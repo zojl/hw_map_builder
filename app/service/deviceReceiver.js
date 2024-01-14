@@ -10,6 +10,10 @@ module.exports = function(app) {
     console.log('listening to incoming devices started at ' + process.env.INCOMING_DEVICES_PORT)
 
     function handleReceivedDevice(req, res) {
+        if (process.env.IS_DUMP_VHINFO_OUT === 'true') {
+            console.log(req);
+        }
+
         const token = req.header('X-Auth-Token');
         if (token != process.env.VHINFO_IN_TOKEN) {
             res.status(401).json({ message: "Unauthorized or invalid token" });
@@ -48,20 +52,28 @@ module.exports = function(app) {
                 users.push(prefix + npc.name);
             }
             
-            const ident = JSON.parse(req.body.ident); 
+            // const ident = JSON.parse(req.body.ident);
             app.dbUtil.dbPusher.pushUsers(
                 users,
                 sourceDevice,
                 req.body.timestamp * 1000,
-                ident.from_id,
+                0, // ident.from_id,
                 false
             );
             console.log(`Received from VI users ${users.join(',')} at ${sourceDevice}`)
         }
         res.json({"status": "OK"});
     }
-    
+
     function getNpcPrefixByTypeId(type) {
+        if (type === 6) {
+            return '🤖'
+        }
+
+        if (type === 5) {
+            return '🚨'
+        }
+
         if (type === 4) {
             return '🎯'
         }

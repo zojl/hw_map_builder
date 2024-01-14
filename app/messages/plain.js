@@ -15,6 +15,7 @@ module.exports = function (app) {
 
         let connectionMessages = [];
         let hitMessage = null;
+        let announceMessage = null;
 
         for (const src of msg.fwd_messages) {
             if (src.from_id !== parseInt(process.env.HW_BOT_ID)) {
@@ -32,10 +33,19 @@ module.exports = function (app) {
 
             if (src.text.startsWith('Ты атаковал отслеживаемого пользователя')) {
                 hitMessage = src;
+                continue;
+            }
+
+            if (
+                src.text.startsWith('📍Подозрительные пользователи были замечены на устройствах:')
+                || src.text.startsWith('🌐Новые цели для атаки в сети')
+            ) {
+                announceMessage = src;
             }
         }
 
         const {lastDevice, replies} = await handleConnectionMessages(connectionMessages, dates.day, msg.from_id);
+        let hasHandledMessages = false;
 
         if (lastDevice !== null) {
             console.log(lastDevice);
@@ -50,16 +60,24 @@ module.exports = function (app) {
 
             let unvisitedMessage = await app.dbUtil.unvisited.makeMessageByCodeAndDay(lastDevice, dates.day, subnet.id);
             ctx.reply('Спасибо!\n' + replies.join('\n') + unvisitedMessage);
-            return;
+            hasHandledMessages = true;
         }
 
-        if (hitMessage !== null && process.env.IS_VHINFO_ENABLED === 'true') {
+        if (hitMessage !== null) {
             const reply = await handleHitMessage(hitMessage, dates.day, msg.from_id);
             ctx.reply(reply);
-            return;
+            hasHandledMessages = true;
         }
 
-        sendHelp(ctx);
+        if (announceMessage !== null) {
+            const reply = await handleAnnounceMessage(announceMessage, dates.day, msg.from_id);
+            ctx.reply(reply);
+            hasHandledMessages = true;
+        }
+
+        if (!hasHandledMessages) {
+            sendHelp(ctx);
+        }
     });
 
     function sendHelp(ctx) {
@@ -89,7 +107,7 @@ module.exports = function (app) {
             let foundUsers = false;
             for (const line of lines) {
                 if (foundConnection) {
-                    if (line.startsWith('📟') && connections.length < 3) {
+                    if (line.startsWith('📟')) {
                         connections.push(line.substring(2,10));
 
                         continue;
@@ -100,6 +118,7 @@ module.exports = function (app) {
                     if (
                         line.startsWith('🎯💣')
                         || line.startsWith('⚔💣')
+                        || line.startsWith('🤖💣')
                         || line.startsWith('⚖')
                         || line.startsWith('👀')
                     ) {
@@ -162,8 +181,48 @@ module.exports = function (app) {
 
         await app.dbUtil.dbPusher.pushUsers([userName], device, hitMessage.date * 1000, vkUserId, true);
 
-        sendHitToVhackInfo(hitMessage);
+        if (process.env.IS_VHINFO_ENABLED === 'true') {
+            sendHitToVhackInfo(hitMessage);
+        }
+
         return `Координаты пользователя ${userName} сохранены`;
+    }
+
+    async function handleAnnounceMessage(announceMessage, day, vkUserId) {
+        message = announceMessage.text;
+        if (
+            !message.startsWith('📍Подозрительные пользователи были замечены на устройствах:')
+            && !message.startsWith('🌐Новые цели для атаки в сети')
+        ) {
+            return;
+        }
+
+        const lines = message.split("\n");
+        let addedNpcs = [];
+        for (const line of lines) {
+            if (!line.startsWith('💣')) {
+                continue;
+            }
+
+            const npcLocation = line.split(': 📟');
+            if (npcLocation.length !== 2) {
+                continue;
+            }
+
+            const npcNamePart = npcLocation[0];
+            const deviceCode = npcLocation[1];
+
+            const foundNpcs = await app.repository.npc.getAllByNamePart(`%${npcNamePart}`);
+            if (foundNpcs.length !== 1) {
+                continue;
+            }
+
+            const npcName = foundNpcs[0].name;
+            await app.dbUtil.dbPusher.pushUsers([foundNpcs[0].name], deviceCode, announceMessage.date * 1000, vkUserId, false);
+            addedNpcs.push(foundNpcs[0].name);
+        }
+
+        return `Координаты пользователей ${addedNpcs.join(', ')} сохранены`;
     }
 
     async function sendDevicesToVhackInfo(userId, message, timestamp) {
@@ -189,10 +248,27 @@ module.exports = function (app) {
                 apiDTO.device_info.users = parseInt(lineComponents[1]);
             }
 
+            // npc: # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый, 5 — наёмник, 6 — ботнет
+            if (line.startsWith('🤖💣')) {
+                apiDTO.device_info.npcs.push({
+                    "name": line.substring('🚨'.length),
+                    "npc": 6,
+                    "type": "nu"
+                })
+            }
+
+            if (line.startsWith('🚨🧭')) {
+                apiDTO.device_info.npcs.push({
+                    "name": line.substring('🚨'.length),
+                    "npc": 5,
+                    "type": "nu"
+                })
+            }
+
             if (line.startsWith('🎯💣')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🎯'.length),
-                    "npc": 4, // # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый
+                    "npc": 4,
                     "type": "nu"
                 })
             }
@@ -232,7 +308,6 @@ module.exports = function (app) {
 
             if (
                 connectionsLine !== null
-                && index <= parseInt(connectionsLine) + 3
                 && line.startsWith('📟')
             ) {
                 apiDTO.device_info.devices.push(parseInt(line.match(/[A-F0-9]{8}/)[0], 16));

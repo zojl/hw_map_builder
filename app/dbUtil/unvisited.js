@@ -6,7 +6,14 @@ module.exports = function(app) {
 
 	async function makeMessageByCodeAndDay(deviceCode, day, subnetId) {
 		const stats = await app.dbUtil.stats(day, subnetId);
-		if (stats.sources >= 256) {
+		const subnet = await app.repository.subnet.getOneById(subnetId);
+		if (subnet === null) {
+			return '\n Ошибка определения подсети';
+		}
+
+		const subnetLimit = subnet.length;
+
+		if (stats.sources >= subnetLimit) {
 			return '\nВсе 📟устройства уже исследованы!'
 		}
 
@@ -27,53 +34,44 @@ module.exports = function(app) {
 	}
 
 	async function getBySourceIdAndDay(sourceId, day, subnetId) {
-		const сonnections = await app.repository.connection.getAllBySourceDayAndSubnet(sourceId, day, subnetId);
-
-		if (сonnections.length == 0) {
+		const unconnected = await app.repository.device.findAllUnconnected(day, subnetId)
+		const subnet = await app.repository.subnet.getOneById(subnetId);
+		if (unconnected.length === 0 || unconnected.length === subnet.length) {
 			return null;
 		}
 
-		let result = [];
-		await recursiveSearch(8, 250, [sourceId], result, day, subnetId);
-		result = sortByLength(result).slice(0, 5);
-		return transformIdsToCodes(result);
+		const pathsLimit = 7;
+		const pathsToShow = await getShortestPaths(unconnected, sourceId, day, subnetId, pathsLimit);
+		return transformIdsToCodes(pathsToShow);
 	}
 
-	async function recursiveSearch(depth, maxCount, trace, result, day, subnetId)
+	async function getShortestPaths(unconnected, sourceId, day, subnetId, pathsLimit)
 	{
-		if (depth == 0 || result.length >= maxCount) {
-			return;
-		}
-
-		const currentDevice = trace[trace.length - 1];
-		const connections = await app.repository.connection.getAllBySourceDayAndSubnet(currentDevice, day, subnetId);
-		if (connections.length == 0) {
-			result.push(trace);
-			return;
-		}
-
-		for (const connection of connections) {
-			await recursiveSearch(depth - 1, maxCount, trace.concat([connection.target]), result, day, subnetId);
-		}
-	}
-
-	function sortByLength(ids) {
-		let pathsByLength = {};
-		for (let path of ids) {
-			const count = path.length;
-			if (typeof(pathsByLength[count]) == 'undefined') {
-				pathsByLength[count] = [];
+		let pathsToUnconnecteds = {};
+		for (const target of unconnected) {
+			const path = await app.dbUtil.dijkstra.getRouteIds(sourceId, target.id, day, subnetId);
+			if (path === null) {
+				continue;
 			}
-			pathsByLength[count].push(path);
+
+			if (typeof(pathsToUnconnecteds[path.length]) === 'undefined') {
+				pathsToUnconnecteds[path.length] = [];
+			}
+
+			pathsToUnconnecteds[path.length].push(path);
 		}
 
-		const sortedKeys = Object.keys(pathsByLength).sort();
-		let returnable = [];
-		for (const key of sortedKeys) {
-			returnable = returnable.concat(pathsByLength[key]);
+		let pathsToShow = []
+		for (const pathLength of Object.keys(pathsToUnconnecteds)) {
+			for (const path of pathsToUnconnecteds[pathLength]) {
+				pathsToShow.push(path);
+				if (pathsToShow.length >= pathsLimit) {
+					return pathsToShow
+				}
+			}
 		}
 
-		return returnable;
+		return pathsToShow;
 	}
 
 	async function transformIdsToCodes(ids) {

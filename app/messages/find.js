@@ -11,6 +11,9 @@ module.exports = function(app) {
     
     const handleFind = async (ctx) => {
         const chat = await app.getChatFromMessage(ctx);
+        if (chat === null) {
+            return;
+        }
         const subnet = await app.getSubnetFromChat(chat);
 
         const args = ctx.message.text.match(/[a-f0-9]{2}/gi);
@@ -54,7 +57,7 @@ module.exports = function(app) {
                 }
                 
                 console.log([connectedDevice.code, target])
-                const route = await app.dbUtil.dijkstra(connectedDevice.code, target, dates.day, subnet.id);
+                const route = await app.dbUtil.dijkstra.getRoute(connectedDevice.code, target, dates.day, subnet.id);
                 if (route !== null) {
                     const cost = route.length;
                     const delimiter = chat.delimiter ? chat.delimiter : ' → ';

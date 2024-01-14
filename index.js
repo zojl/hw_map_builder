@@ -45,7 +45,7 @@ app.repository.npcLocation = require('./app/repository/npcLocation.js')(app.db, 
 
 app.dbUtil = {};
 app.dbUtil.dbPusher = require('./app/dbUtil/dbPusher.js')(app.db, app.model);
-app.dbUtil.dijkstra = require('./app/dbUtil/dijkstra.js')(app.db, app.model);
+app.dbUtil.dijkstra = require('./app/dbUtil/dijkstra.js')(app);
 app.dbUtil.stats = require('./app/dbUtil/stats.js')(app.db, app.model);
 app.dbUtil.unvisited = require('./app/dbUtil/unvisited.js')(app);
 app.dbUtil.countedLinks = require('./app/dbUtil/countedLinks.js')(app);
@@ -80,6 +80,7 @@ app.getDates = function() {
 app.getChatFromMessage = async function(ctx) {
   const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
   if (chat === null) {
+    console.log(`Chat ${chat} is not registered`);
     ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте.');
     return null;
   }
@@ -88,9 +89,16 @@ app.getChatFromMessage = async function(ctx) {
 }
 
 app.getSubnetFromChat = async function(chat) {
+  if (typeof(chat.subnet) === 'undefined') {
+    console.log(`Chat ${chat} is badly registered`);
+    return null;
+  }
+
   const subnet = await app.repository.subnet.getOneById(chat.subnet);
   if (subnet === null) {
-    ctx.reply('Ошибка получения подсети, обратитесь в техподдержку.');
+    console.log(`Chat ${chat} is badly registered`);
+    return null;
+    //ctx.reply('Ошибка получения подсети, обратитесь в техподдержку.');
   }
 
   return subnet;
