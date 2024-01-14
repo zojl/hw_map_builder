@@ -88,8 +88,8 @@ module.exports = function(app) {
 			ctx.message.from_id,
 			result
 		]);
-		if (result === null) {
-			ctx.reply('У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить такой маршрут.');
+		if (result === null || result.length === 0) {
+			ctx.reply(`❌ У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить маршрут от 📟${args[1]} до 📟${target}.`);
 			return;
 		}
 
@@ -131,11 +131,13 @@ module.exports = function(app) {
 			}
 
 			const route = await app.dbUtil.dijkstra.getRoute(args[1], target, dates.day, subnet.id);
-			if (route !== null) {
+			if (route !== null && route.length > 0) {
 				const cost = route.length - 1;
 				const routeReadable = route.join(delimiter);
 				routes.push(`⚡${cost}: ${routeReadable}`);
 				usedDevices.push(target.toUpperCase());
+			} else {
+				routes.push(`❌ Не могу построить путь от 📟${args[1]} до 📟${target}`);
 			}
 		}
 

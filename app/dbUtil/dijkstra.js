@@ -20,10 +20,11 @@ module.exports = function(app) {
     try {
       routeResult = await app.db.query(query);
       if (routeResult[0].length == 0) {
-        return null;
+        return [];
       }
     } catch (error) {
-      return null;
+      console.log(error);
+      return [];
     }
 
     let deviceIds = [];
