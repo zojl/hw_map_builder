@@ -50,7 +50,7 @@ module.exports = function(app) {
 		let pathsToUnconnecteds = {};
 		for (const target of unconnected) {
 			const path = await app.dbUtil.dijkstra.getRouteIds(sourceId, target.id, day, subnetId);
-			if (path === null) {
+			if (path === null || path.length === 0) {
 				continue;
 			}
 

@@ -92,7 +92,7 @@ module.exports = function(sequelize, models) {
 
     async function findAllUnconnected(day, subnetId) {
         const devices = await models.devices.findAll({
-            where: sequelize.literal(`(SELECT COUNT(*) FROM connections WHERE subnet = ${subnetId} AND day = ${day} AND source = devices.id) = 0`)
+            where: sequelize.literal(`(SELECT COUNT(*) FROM connections WHERE subnet = ${subnetId} AND day = ${day} AND source = devices.id) = 0 AND (SELECT COUNT(*) FROM connections WHERE subnet = ${subnetId} AND day = ${day} AND target = devices.id) > 0`)
         });
 
         if (devices === null || devices.length === 0) {

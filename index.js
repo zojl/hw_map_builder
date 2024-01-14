@@ -80,7 +80,7 @@ app.getDates = function() {
 app.getChatFromMessage = async function(ctx) {
   const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
   if (chat === null) {
-    console.log(`Chat ${chat} is not registered`);
+    console.log(`Chat ${ctx.message.peer_id} is not registered`);
     ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте.');
     return null;
   }
