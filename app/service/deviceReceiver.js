@@ -10,7 +10,7 @@ module.exports = function(app) {
     console.log('listening to incoming devices started at ' + process.env.INCOMING_DEVICES_PORT)
 
     function handleReceivedDevice(req, res) {
-        if (process.env.IS_DUMP_VHINFO_OUT === 'true') {
+        if (process.env.IS_INCOMING_DUMP === 'true') {
             console.log(req);
         }
 
@@ -49,7 +49,8 @@ module.exports = function(app) {
                     continue;
                 }
                 
-                users.push(prefix + npc.name);
+                const npcName = npc.displayed_name ? npc.displayed_name: npc.name;
+                users.push(prefix + npcName);
             }
             
             // const ident = JSON.parse(req.body.ident);

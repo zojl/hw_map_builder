@@ -32,6 +32,7 @@ module.exports = function(app) {
         }
 
         const npcLocations = await app.repository.npcLocation.findLastBySubnet(subnet.id);
+        const oneDay = 24 * 60 * 60 * 1000; // milliseconds in a day
         
         let responseParts = {}
         const delimiter = chat.delimiter ? chat.delimiter : ' → ';
@@ -40,6 +41,11 @@ module.exports = function(app) {
             const device = await app.repository.device.getOneById(npcLocation.device);
             
             const today = new Date();
+            const timeDiff = today - npcLocation.messageDate;
+            if (timeDiff > oneDay) {
+                continue;
+            }
+            
             const time = npcLocation.messageDate.toDateString() === today.toDateString()
                 ? npcLocation.messageDate.toLocaleTimeString('ru-RU', { hour: 'numeric', minute: 'numeric' })
                 : npcLocation.messageDate.toLocaleTimeString('ru-RU', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })

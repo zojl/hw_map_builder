@@ -67,7 +67,7 @@ module.exports = function(app) {
 					}
 				}
 
-				console.info('Added ' + addedCounter + ' devices');
+				console.info('Imported ' + addedCounter + ' devices from statbot');
 				lasfUpdateHash = responseHash;
             });
 		});
