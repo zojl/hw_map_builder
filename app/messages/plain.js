@@ -251,7 +251,7 @@ module.exports = function (app) {
             // npc: # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый, 5 — наёмник, 6 — ботнет
             if (line.startsWith('🤖💣')) {
                 apiDTO.device_info.npcs.push({
-                    "name": line.substring('🚨'.length),
+                    "name": line.substring('🤖'.length),
                     "npc": 6,
                     "type": "nu"
                 })

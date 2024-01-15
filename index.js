@@ -34,6 +34,11 @@ fs.readdir('./app/model/', function (err, files) {
 });
 app.db.query("CREATE EXTENSION IF NOT EXISTS PostGIS;");
 app.db.query("CREATE EXTENSION IF NOT EXISTS pgRouting;");
+app.db.query(`CREATE OR REPLACE FUNCTION hex2dec(in_hex TEXT)
+RETURNS INT
+IMMUTABLE STRICT LANGUAGE sql AS $body$
+  SELECT CAST(CAST(('x' || CAST($1 AS text)) AS bit(8)) AS INT);
+$body$;`);
 
 app.repository = {};
 app.repository.connection = require('./app/repository/connection.js')(app.db, app.model);
@@ -45,7 +50,7 @@ app.repository.npcLocation = require('./app/repository/npcLocation.js')(app.db, 
 
 app.dbUtil = {};
 app.dbUtil.dbPusher = require('./app/dbUtil/dbPusher.js')(app.db, app.model);
-app.dbUtil.dijkstra = require('./app/dbUtil/dijkstra.js')(app);
+app.dbUtil.pgroute = require('./app/dbUtil/pgroute.js')(app);
 app.dbUtil.stats = require('./app/dbUtil/stats.js')(app.db, app.model);
 app.dbUtil.unvisited = require('./app/dbUtil/unvisited.js')(app);
 app.dbUtil.countedLinks = require('./app/dbUtil/countedLinks.js')(app);

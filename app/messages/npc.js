@@ -45,7 +45,7 @@ module.exports = function(app) {
             if (timeDiff > oneDay) {
                 continue;
             }
-            
+
             const time = npcLocation.messageDate.toDateString() === today.toDateString()
                 ? npcLocation.messageDate.toLocaleTimeString('ru-RU', { hour: 'numeric', minute: 'numeric' })
                 : npcLocation.messageDate.toLocaleTimeString('ru-RU', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
@@ -54,7 +54,7 @@ module.exports = function(app) {
             responseParts[npc.name] = `${npc.name}: 📟${device.code} (${time})`;
             
             if (sourceDevice !== null) {
-                const route = await app.dbUtil.dijkstra.getRoute(sourceDevice.code, device.code, dates.day, subnet.id)
+                const route = await app.dbUtil.pgroute.getRoute(sourceDevice.code, device.code, dates.day, subnet.id)
                 if (route === null || route.length === 0) {
                     responseParts[npc.name] = responseParts[npc.name] + `\nНе удаётся построить путь от ${sourceDevice.code} до ${device.code}\n`;
                 } else {

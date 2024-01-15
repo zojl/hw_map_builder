@@ -38,7 +38,7 @@ module.exports = function(app) {
             targetDevices.push(dec.toString(16).toUpperCase());
         };
 
-        console.log('Received from VI: ' + sourceDevice + ' linked to ' + targetDevices.join(', '));
+        console.log('Received from VI (ident ' + req.body.ident  + '): ' + sourceDevice + ' linked to ' + targetDevices.join(', '));
         const result = app.dbUtil.dbPusher.pushConnections(sourceDevice, targetDevices, dates.day);
         
         if (req.body.device.npcs.length > 0) {
@@ -61,7 +61,7 @@ module.exports = function(app) {
                 0, // ident.from_id,
                 false
             );
-            console.log(`Received from VI users ${users.join(',')} at ${sourceDevice}`)
+            console.log(`Received from VI (ident ${req.body.ident}) users ${users.join(',')} at ${sourceDevice}`)
         }
         res.json({"status": "OK"});
     }

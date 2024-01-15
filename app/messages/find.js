@@ -57,7 +57,7 @@ module.exports = function(app) {
                 }
                 
                 console.log([connectedDevice.code, target])
-                const route = await app.dbUtil.dijkstra.getRoute(connectedDevice.code, target, dates.day, subnet.id);
+                const route = await app.dbUtil.pgroute.getRoute(connectedDevice.code, target, dates.day, subnet.id);
                 if (route !== null) {
                     const cost = route.length;
                     const delimiter = chat.delimiter ? chat.delimiter : ' → ';

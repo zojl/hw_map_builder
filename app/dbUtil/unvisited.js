@@ -49,7 +49,7 @@ module.exports = function(app) {
 	{
 		let pathsToUnconnecteds = {};
 		for (const target of unconnected) {
-			const path = await app.dbUtil.dijkstra.getRouteIds(sourceId, target.id, day, subnetId);
+			const path = await app.dbUtil.pgroute.getRouteIds(sourceId, target.id, day, subnetId);
 			if (path === null || path.length === 0) {
 				continue;
 			}

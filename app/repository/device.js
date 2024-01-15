@@ -23,7 +23,10 @@ module.exports = function(sequelize, models) {
     }
 
     async function getOneByCode(code) {
-        code = code.substr(code.length - 2).toUpperCase();
+        if (code.length > 2) {
+            code = code.substr(code.length - 2);
+        }
+        code = code.toUpperCase();
 
         const deviceEntity = await models.devices.findOne({
             where: {
@@ -33,7 +36,7 @@ module.exports = function(sequelize, models) {
 
         if (deviceEntity === null) {
             return null;
-        } 
+        }
 
         return deviceEntity;
     }
