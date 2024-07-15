@@ -20,7 +20,7 @@ module.exports =
                     "statbot", //статбот
                     "map", //интерактивная карта
                     "underbot", //"недо-бот" NK
-                    //"nhsmap", //бот НХС
+                    "nhsmap", //бот НХС
                 ],
                 "no_transit": [] //кому не пересылать
             }

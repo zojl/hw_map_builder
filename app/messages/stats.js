@@ -3,17 +3,37 @@ module.exports = function(app) {
 	const linkToDeviceCount = 3;
 	app.bot.command('/stats', async (ctx) => {
 		const subnet = await app.getSubnetFromMessage(ctx);
+		if (subnet == null) {
+			return;
+		}
 
+		const args = ctx.message.text.split(' ');
+		let stats, length;
 		let dates = app.getDates();
-		const stats = await app.dbUtil.stats(dates.day, subnet.id);
+
+		if (args.length < 3) {
+			stats = await app.dbUtil.stats(dates.day, subnet.id);
+			length = subnet.length;
+		} else {
+			let rangeStart = parseInt(args[1], 16);
+			let rangeEnd = parseInt(args[2], 16);
+			if (isNaN(rangeStart) || isNaN(rangeEnd) || rangeStart >= rangeEnd) {
+				ctx.reply('Некорректный диапазон');
+			}
+
+			stats = await app.dbUtil.stats(dates.day, subnet.id, rangeStart, rangeEnd);
+			length = rangeEnd - rangeStart + 1;
+		}
+
 		const reply = "С последней перестройки карты обнаружено:\n Исходных устройств: "
-			+ formatCount(stats.sources, subnet.length)
+			+ formatCount(stats.sources, length)
 			+ "\n Целевых устройств: "
-			+ formatCount(stats.targets, subnet.length)
-			//+ "\n Связей в сети: "
-		    //+ formatCount(stats.connections, subnet.length * linkToDeviceCount)
+			+ formatCount(stats.targets, length)
 		;
 		ctx.reply(reply);
+
+
+
 	});
 
 	function formatCount(count, subnetLength) {

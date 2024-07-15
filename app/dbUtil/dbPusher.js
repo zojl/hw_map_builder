@@ -15,6 +15,10 @@ module.exports = function(sequelize, models) {
     let result = true;
 
     for (const connection of connections) {
+      if (connection.substr(0, 6) != subnetCode) {
+        console.log([connection.substr(0, 6), subnetCode]);
+        continue;
+      }
       const target = await findOrCreateDevice(connection);
       result = result && await createConnection(src, target, day, subnet.id);
     }

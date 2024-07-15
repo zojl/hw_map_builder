@@ -121,6 +121,7 @@ module.exports = function (app) {
                         || line.startsWith('🤖💣')
                         || line.startsWith('⚖')
                         || line.startsWith('👀')
+                        || line.startsWith('🚸💣')
                     ) {
                         users.push(line);
                         continue;
@@ -248,7 +249,15 @@ module.exports = function (app) {
                 apiDTO.device_info.users = parseInt(lineComponents[1]);
             }
 
-            // npc: # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый, 5 — наёмник, 6 — ботнет
+            // npc: # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый, 5 — наёмник, 6 — ботнет, 7 — нарушитель
+            if (line.startsWith('🚸💣')) {
+                apiDTO.device_info.npcs.push({
+                    "name": line.substring('🚸'.length),
+                    "npc": 7,
+                    "type": "nu"
+                })
+            }
+
             if (line.startsWith('🤖💣')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🤖'.length),

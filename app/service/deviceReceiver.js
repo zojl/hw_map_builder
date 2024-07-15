@@ -67,6 +67,10 @@ module.exports = function(app) {
     }
 
     function getNpcPrefixByTypeId(type) {
+        if (type === 7) {
+            return '🚸'
+        }
+
         if (type === 6) {
             return '🤖'
         }
