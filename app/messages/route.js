@@ -1,27 +1,27 @@
 module.exports = function(app) {
 	app.bot.command('/r ', (ctx) => {
-		handleCommand(ctx);
+		handleRouteGroup(ctx);
 	})
 
 	app.bot.command('/p ', (ctx) => {
-		handleCommand(ctx);
+		handleRouteGroup(ctx);
 	})
 
 	app.bot.command('/w ', (ctx) => {
-		handleCommand(ctx);
+		handleRouteGroup(ctx);
 	})
 
 	app.bot.command('/route ', (ctx) => {
-		handleCommand(ctx);
+		handleRouteGroup(ctx);
 	})
 
 
 	app.bot.command('/path ', (ctx) => {
-		handleCommand(ctx);
+		handleRouteGroup(ctx);
 	})
 
 	app.bot.command('/way ', (ctx) => {
-		handleCommand(ctx);
+		handleRouteGroup(ctx);
 	})
 
 	app.bot.command('/wg ', (ctx) => {
@@ -64,57 +64,6 @@ module.exports = function(app) {
 		handleTraverse(ctx);
 	})
 
-	async function handleCommand(ctx) {
-		const chat = await app.getChatFromMessage(ctx);
-		if (chat === null) {
-			return;
-		}
-		const subnet = await app.getSubnetFromChat(chat);
-
-		let dates = app.getDates();
-        let targetFromReply = null;
-
-        if (
-            typeof(ctx.message.reply_message) !== 'undefined'
-            && typeof(ctx.message.reply_message.fwd_messages) === 'object'
-            && Array.isArray(ctx.message.reply_message.fwd_messages)
-            && ctx.message.reply_message.fwd_messages.length === 1
-            && ctx.message.reply_message.fwd_messages[0].from_id === parseInt(process.env.HW_BOT_ID)
-            && ctx.message.reply_message.fwd_messages[0].text.startsWith('Ты атаковал отслеживаемого пользователя')
-        ) {
-            const msgText = ctx.message.reply_message.fwd_messages[0].text;
-            targetFromReply = msgText.substring(msgText.length - 2);
-        }
-
-        const args = ctx.message.text.split(' ');
-		if (
-            args.length <= 2
-            && !(
-                args.length === 2
-                && targetFromReply !== null
-            )
-        ) {
-			ctx.reply('Укажи исходное и конечное устройство, например /route 00 FF');
-			return;
-		}
-
-        const target = targetFromReply !== null ? targetFromReply : args[2];
-		const result = await app.dbUtil.pgroute.getRoute(args[1], target, dates.day, subnet.id);
-		console.log([
-			ctx.message.from_id,
-			result
-		]);
-		if (result === null || result.length === 0) {
-			ctx.reply(`❌ У меня пока недостаточно данных о сегодняшних устройствах, чтобы построить маршрут от 📟${args[1]} до 📟${target}.`);
-			return;
-		}
-
-		const cost = result.length - 1;
-		const delimiter = chat.delimiter ? chat.delimiter : ' → ';
-		const route = result.join(delimiter);
-		ctx.reply(`⚡${cost}: ${route}`);
-	}
-
 	async function handleRouteGroup(ctx) {
 		const chat = await app.getChatFromMessage(ctx);
 		if (chat === null) {
@@ -124,29 +73,31 @@ module.exports = function(app) {
 		let dates = app.getDates();
 
 		const args = ctx.message.text.split(' ');
-		if (args.length < 4) {
-			ctx.reply('Укажи исходное устройство и список конечных, например /route 00 AA BB CC DD, где 00 — исходное');
+		if (args.length < 3) {
+			ctx.reply('Укажи исходное устройство и одно или несколько конечных, например /route 00 AA BB CC DD, где 00 — исходное');
 			return;
 		}
 
 		let routes = [];
 		let usedDevices = [];
 		const delimiter = chat.delimiter ? chat.delimiter : ' → ';
+		const source = args[1].length == 1 ? "0" + args[1] : args[1];
 		for (const targetNum in args) {
 			if (targetNum < 2) {
 				continue;
 			}
 
-			const target = args[targetNum];
+			const target = args[targetNum].length == 1 ? "0" + args[targetNum] : args[targetNum];
 			if (parseInt(target, 16) > 255) {
-				continue;
+				routes.join(`❌ Некорректное устройство 📟${target}`);
+				continue
 			}
 
 			if (usedDevices.includes(target.toUpperCase())) {
 				continue;
 			}
 
-			const route = await app.dbUtil.pgroute.getRoute(args[1], target, dates.day, subnet.id);
+			const route = await app.dbUtil.pgroute.getRoute(source, target, dates.day, subnet.id);
 			if (route !== null && route.length > 0) {
 				const cost = route.length - 1;
 				const routeReadable = route.join(delimiter);
@@ -162,7 +113,12 @@ module.exports = function(app) {
 			return;
 		}
 
-		ctx.reply("Известные пути до указанных устройств:\n" + routes.join("\n"));
+		const deprecatedCommands = ['/wg', '/rg', '/pg', '/waygroup', '/routegroup', '/pathgroup'];
+		if (deprecatedCommands.includes(args[0].toLowerCase())) {
+			routes.push(`\n⚠Команды группового поиска (например, ${args[0]}) объявлены устаревшими и будут удалены в скором времени. Используйте базовые команды поиска пути (/p, /r, /w).`)
+		}
+
+		ctx.reply(routes.join("\n"));
 	}
 
 	async function handleTraverse(ctx) {
