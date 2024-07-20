@@ -119,6 +119,7 @@ module.exports = function (app) {
                         line.startsWith('🎯💣')
                         || line.startsWith('⚔💣')
                         || line.startsWith('🤖💣')
+                        || line.startsWith('🚨🧭')
                         || line.startsWith('⚖')
                         || line.startsWith('👀')
                         || line.startsWith('🚸💣')
