@@ -1,6 +1,7 @@
 module.exports = function(sequelize, models) {
     return {
         getOneByChatAndNpc,
+        getAllByChat,
         getAllByNpcNames,
     }
     
@@ -13,13 +14,21 @@ module.exports = function(sequelize, models) {
         });
     }
 
+    async function getAllByChat(chatId) {
+        return await models.chatNpcs.findAll({
+            where: {
+                chat: chatId,
+            }
+        });
+    }
+
     async function getAllByNpcNames(npcNames) {
         const npcs = await models.npcs.findAll({
             where: {
                 name: npcNames
             }
         })
-        if (npcs.length === 0) {
+        if (npcs.length === 0 || npcs === null) {
             return [];
         }
         
@@ -32,7 +41,7 @@ module.exports = function(sequelize, models) {
                 npc: npcIds
             }
         });
-        if (chatNpcs.length === 0) {
+        if (chatNpcs.length === 0 || npcs === null) {
             return [];
         }
         
@@ -49,11 +58,18 @@ module.exports = function(sequelize, models) {
         }
         
         for (const chat of chats) {
+            if (!chat.canSeeNpc) {
+                continue;
+            }
             requiredChats[chat.id] = chat.peerId;
         }
         
         let outChatNpcs = [];
         for (const chatNpc of chatNpcs) {
+            if (typeof(requiredChats[chatNpc.chat]) === 'undefined') {
+                continue;
+            }
+
             outChatNpcs.push({
                 chat: requiredChats[chatNpc.chat],
                 npc: requiredNpcs[chatNpc.npc]

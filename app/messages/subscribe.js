@@ -1,14 +1,24 @@
 module.exports = function(app) {
     app.bot.command('/subscribe', (ctx) => handleSubscribe(ctx));
-    app.bot.command('/sub', (ctx) => handleSubscribe(ctx));
+    app.bot.command('/sub ', (ctx) => handleSubscribe(ctx));
+
     app.bot.command('/unsubscribe', (ctx) => handleUnsubscribe(ctx));
     app.bot.command('/unsub', (ctx) => handleUnsubscribe(ctx));
     
+    app.bot.command('/subscriptions', (ctx) => handleSubList(ctx));
+    app.bot.command('/sublist', (ctx) => handleSubList(ctx))
+    app.bot.command('/subs', (ctx) => handleSubList(ctx))
+
     const handleSubscribe = async (ctx) => {
 		const chat = await app.getChatFromMessage(ctx);
         if (chat == null) {
 			return;
 		}
+
+        if (!chat.canSeeNpc) {
+            ctx.reply('Чат не имеет доступа к NPC');
+            return;
+        }
 
 		const args = ctx.message.text.split(' ');
 
@@ -64,9 +74,33 @@ module.exports = function(app) {
         }
         
         await app.model.chatNpcs.destroy({
-            chat: chat.id,
-            npc: npc.id,
+            where: {
+                chat: chat.id,
+                npc: npc.id,
+            }
         });
         ctx.reply('Чат отписан от обновлений NPC ' + npc.name);
+    }
+
+    const handleSubList = async (ctx) => {
+        const chat = await app.getChatFromMessage(ctx);
+        if (chat == null) {
+            return;
+        }
+
+        const subscriptions = await app.repository.chatNpc.getAllByChat(chat.id);
+        if (subscriptions.length === 0 || subscriptions === null) {
+            ctx.reply('Чат не подписан на обновления NPC');
+            return;
+        }
+
+        const npcIds = subscriptions.map((sub) => sub.npc);
+        const npcs = await app.repository.npc.getAllByIds(npcIds);
+        const npcNames = npcs.map((npc) => npc.name).join("\n");
+        const addition = chat.canSeeNpc
+            ? ""
+            : "\nЧат не имеет доступа к актуальным NPC, поэтому уведомления приходить не будут. Обратитесь к администратору бота.";
+
+        ctx.reply("Чат подписан на обновления NPC:\n" + npcNames + addition);
     }
 }

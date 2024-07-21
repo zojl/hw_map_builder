@@ -1,6 +1,7 @@
 module.exports = function(sequelize, models) {
     return {
         getOneById,
+        getAllByIds,
         getOneByName,
         getAllByNamePart,
     }
@@ -13,6 +14,14 @@ module.exports = function(sequelize, models) {
         });
 
         return npc;
+    }
+
+    async function getAllByIds(npcIds) {
+        return await models.npcs.findAll({
+            where: {
+                id: npcIds
+            }
+        });
     }
 
     async function getOneByName(npcName) {
