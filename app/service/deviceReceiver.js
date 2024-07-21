@@ -62,6 +62,7 @@ module.exports = function(app) {
                 false
             );
             console.log(`Received from VI (ident ${req.body.ident}) users ${users.join(',')} at ${sourceDevice}`)
+            app.service.npcNotifier.notifyChats(null, users, sourceDevice);
         }
         res.json({"status": "OK"});
     }

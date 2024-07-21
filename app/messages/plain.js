@@ -44,7 +44,8 @@ module.exports = function (app) {
             }
         }
 
-        const {lastDevice, replies} = await handleConnectionMessages(connectionMessages, dates.day, msg.from_id);
+        const chat = await app.getChatFromMessage(ctx);
+        const {lastDevice, replies} = await handleConnectionMessages(connectionMessages, dates.day, msg.from_id, chat);
         let hasHandledMessages = false;
 
         if (lastDevice !== null) {
@@ -64,7 +65,7 @@ module.exports = function (app) {
         }
 
         if (hitMessage !== null) {
-            const reply = await handleHitMessage(hitMessage, dates.day, msg.from_id);
+            const reply = await handleHitMessage(hitMessage, dates.day, msg.from_id, chat);
             ctx.reply(reply);
             hasHandledMessages = true;
         }
@@ -86,7 +87,7 @@ module.exports = function (app) {
         }
     }
 
-    async function handleConnectionMessages(connectionMessages, day, from) {
+    async function handleConnectionMessages(connectionMessages, day, from, chat) {
         let lastDevice = null;
         let replies = [];
         for (const src of connectionMessages) {
@@ -147,6 +148,7 @@ module.exports = function (app) {
 
             if (users.length > 0) {
                 await app.dbUtil.dbPusher.pushUsers(users, device, src.date * 1000, from, false);
+                await app.service.npcNotifier.notifyChats(chat.peerId??null, users, device);
                 const msgUserPlural = (users.length === 1) ? 'пользователя' : 'пользователей';
                 replies.push(`Координаты ${msgUserPlural} ${users.join(', ')} сохранены`);
             }
@@ -168,7 +170,7 @@ module.exports = function (app) {
         }
     }
 
-    async function handleHitMessage(hitMessage, day, vkUserId) {
+    async function handleHitMessage(hitMessage, day, vkUserId, chat) {
         message = hitMessage.text;
         if (!message.startsWith('Ты атаковал отслеживаемого пользователя')) {
             return;
@@ -182,6 +184,7 @@ module.exports = function (app) {
         const device = deviceLine[deviceLine.length - 1];
 
         await app.dbUtil.dbPusher.pushUsers([userName], device, hitMessage.date * 1000, vkUserId, true);
+        await app.service.npcNotifier.notifyChats(chat.peerId??null, [userName], device);
 
         if (process.env.IS_VHINFO_ENABLED === 'true') {
             sendHitToVhackInfo(hitMessage);

@@ -1,69 +1,23 @@
 module.exports = function(app) {
-	app.bot.command('/r ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
+	app.bot.command('/r ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/p ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/w ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/route ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/path ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/way ', (ctx) => handleRouteGroup(ctx));
 
-	app.bot.command('/p ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
+	app.bot.command('/wg ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/rg ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/pg ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/routegroup ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/pathgroup ', (ctx) => handleRouteGroup(ctx));
+	app.bot.command('/waygroup ', (ctx) => handleRouteGroup(ctx));
 
-	app.bot.command('/w ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/route ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-
-	app.bot.command('/path ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/way ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/wg ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/rg ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/pg ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/routegroup ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/pathgroup ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/waygroup ', (ctx) => {
-		handleRouteGroup(ctx);
-	})
-
-	app.bot.command('/traverse', (ctx) => {
-		handleTraverse(ctx);
-	})
-
-	app.bot.command('/trv', (ctx) => {
-		handleTraverse(ctx);
-	})
-
-	app.bot.command('/tsp', (ctx) => {
-		handleTraverse(ctx);
-	})
-
-	app.bot.command('/t', (ctx) => {
-		handleTraverse(ctx);
-	})
-
+	app.bot.command('/traverse', (ctx) => handleTraverse(ctx));
+	app.bot.command('/trv', (ctx) => handleTraverse(ctx));
+	app.bot.command('/tsp', (ctx) => handleTraverse(ctx));
+	app.bot.command('/t', (ctx) => handleTraverse(ctx));
+	
 	async function handleRouteGroup(ctx) {
 		const chat = await app.getChatFromMessage(ctx);
 		if (chat === null) {

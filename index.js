@@ -41,12 +41,12 @@ IMMUTABLE STRICT LANGUAGE sql AS $body$
 $body$;`);
 
 app.repository = {};
-app.repository.connection = require('./app/repository/connection.js')(app.db, app.model);
-app.repository.device = require('./app/repository/device.js')(app.db, app.model);
-app.repository.subnet = require('./app/repository/subnet.js')(app.db, app.model);
-app.repository.chat = require('./app/repository/chat.js')(app.db, app.model);
-app.repository.npc = require('./app/repository/npc.js')(app.db, app.model);
-app.repository.npcLocation = require('./app/repository/npcLocation.js')(app.db, app.model);
+fs.readdir('./app/repository/', function (err, files) {
+  for (const scriptname of files) {
+    const repoName = scriptname.split('.')[0];
+    app.repository[repoName] = require('./app/repository/' + scriptname)(app.db, app.model);
+  };
+});
 
 app.dbUtil = {};
 app.dbUtil.dbPusher = require('./app/dbUtil/dbPusher.js')(app.db, app.model);
@@ -58,6 +58,7 @@ app.dbUtil.countedLinks = require('./app/dbUtil/countedLinks.js')(app);
 app.service = {};
 app.service.vHackApi = require('./app/service/vHackApi.js')(app);
 app.service.statBotImporter = require('./app/service/statBotImporter.js')(app);
+app.service.npcNotifier = require('./app/service/npcNotifier.js')(app);
 
 app.getDates = function() {
   const now = new Date();
@@ -124,6 +125,7 @@ require('./app/messages/link.js')(app);
 require('./app/messages/cycle.js')(app);
 require('./app/messages/find.js')(app);
 require('./app/messages/npc.js')(app);
+require('./app/messages/subscribe.js')(app);
 
 require('./app/messages/chat.js')(app);
 
