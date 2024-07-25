@@ -44,7 +44,7 @@ module.exports = function (app) {
             }
         }
 
-        const chat = await app.getChatFromMessage(ctx);
+        const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
         const {lastDevice, replies} = await handleConnectionMessages(connectionMessages, dates.day, msg.from_id, chat);
         let hasHandledMessages = false;
 
