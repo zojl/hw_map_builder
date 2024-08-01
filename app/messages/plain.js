@@ -233,29 +233,25 @@ module.exports = function (app) {
         return `Координаты пользователей ${addedNpcs.join(', ')} сохранены`;
     }
 
-    function getNpcPrefix(npcName) {
+    function checkNpcPrefix(npcName) {
         const npcPrefixes = [
-            '🎯',
-            '⚔',
-            '🤖',
-            '🚨',
+            '🎯💣',
+            '⚔💣',
+            '🤖💣',
+            '🚨🧭',
             '⚖',
             '👀',
-            '🚸',
+            '🚸💣',
             '🛂',
         ];
 
         for (prefix of npcPrefixes) {
             if (npcName.startsWith(prefix)) {
-                return prefix;
+                return true;
             }
         }
 
-        return null;
-    }
-
-    function checkNpcPrefix(npcName) {
-        return getNpcPrefix(npcName) !== null;
+        return false;
     }
 
     async function sendDevicesToVhackInfo(userId, message, timestamp) {
@@ -315,7 +311,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🚨')) {
+            if (line.startsWith('🚨🧭')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🚨'.length),
                     "npc": 5,
@@ -323,7 +319,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🎯')) {
+            if (line.startsWith('🎯💣')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🎯'.length),
                     "npc": 4,
@@ -332,7 +328,9 @@ module.exports = function (app) {
             }
 
             if (
-                line.startsWith('⚖')
+                line.startsWith('⚖💣')
+                || line.startsWith('⚖🔸')
+                || line.startsWith('⚖🔺')
             ) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('⚖'.length),
@@ -341,7 +339,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('⚔')) {
+            if (line.startsWith('⚔💣')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('⚔'.length),
                     "npc": 2,
