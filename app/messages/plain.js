@@ -45,7 +45,9 @@ module.exports = function (app) {
         }
 
         const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
-        const {lastDevice, replies} = await handleConnectionMessages(connectionMessages, dates.day, msg.from_id, chat);
+        const chatPeerId = chat === null || typeof(chat.peerId) == 'undefined' ? null : chat.peerId;
+        const silentMode = ctx.message.text.startsWith('/s');
+        const {lastDevice, replies} = await handleConnectionMessages(connectionMessages, dates.day, msg.from_id, chatPeerId, silentMode);
         let hasHandledMessages = false;
 
         if (lastDevice !== null) {
@@ -65,7 +67,7 @@ module.exports = function (app) {
         }
 
         if (hitMessage !== null) {
-            const reply = await handleHitMessage(hitMessage, dates.day, msg.from_id, chat);
+            const reply = await handleHitMessage(hitMessage, dates.day, msg.from_id, chatPeerId, silentMode);
             ctx.reply(reply);
             hasHandledMessages = true;
         }
@@ -87,7 +89,7 @@ module.exports = function (app) {
         }
     }
 
-    async function handleConnectionMessages(connectionMessages, day, from, chat) {
+    async function handleConnectionMessages(connectionMessages, day, from, chatPeerId, silentMode) {
         let lastDevice = null;
         let replies = [];
         for (const src of connectionMessages) {
@@ -116,15 +118,7 @@ module.exports = function (app) {
                 }
 
                 if (foundUsers) {
-                    if (
-                        line.startsWith('🎯💣')
-                        || line.startsWith('⚔💣')
-                        || line.startsWith('🤖💣')
-                        || line.startsWith('🚨🧭')
-                        || line.startsWith('⚖')
-                        || line.startsWith('👀')
-                        || line.startsWith('🚸💣')
-                    ) {
+                    if (checkNpcPrefix(line)) {
                         users.push(line);
                         continue;
                     }
@@ -148,13 +142,15 @@ module.exports = function (app) {
 
             if (users.length > 0) {
                 await app.dbUtil.dbPusher.pushUsers(users, device, src.date * 1000, from, false);
-                await app.service.npcNotifier.notifyChats(chat.peerId??null, users, device);
+                await app.service.npcNotifier.notifyChats(chatPeerId, users, device, src.date * 1000);
                 const msgUserPlural = (users.length === 1) ? 'пользователя' : 'пользователей';
                 replies.push(`Координаты ${msgUserPlural} ${users.join(', ')} сохранены`);
             }
 
-
-            if (process.env.IS_VHINFO_ENABLED === 'true') {
+            if (
+                !silentMode
+                && process.env.IS_VHINFO_ENABLED === 'true'
+            ) {
                 try {
                     sendDevicesToVhackInfo(from, message, src.date);
                 } catch (error) {
@@ -170,7 +166,7 @@ module.exports = function (app) {
         }
     }
 
-    async function handleHitMessage(hitMessage, day, vkUserId, chat) {
+    async function handleHitMessage(hitMessage, day, vkUserId, chatPeerId, silentMode) {
         message = hitMessage.text;
         if (!message.startsWith('Ты атаковал отслеживаемого пользователя')) {
             return;
@@ -184,9 +180,12 @@ module.exports = function (app) {
         const device = deviceLine[deviceLine.length - 1];
 
         await app.dbUtil.dbPusher.pushUsers([userName], device, hitMessage.date * 1000, vkUserId, true);
-        await app.service.npcNotifier.notifyChats(chat.peerId??null, [userName], device);
+        await app.service.npcNotifier.notifyChats(chatPeerId, [userName], device, hitMessage.date * 1000);
 
-        if (process.env.IS_VHINFO_ENABLED === 'true') {
+        if (
+            !silentMode
+            && process.env.IS_VHINFO_ENABLED === 'true'
+        ) {
             sendHitToVhackInfo(hitMessage);
         }
 
@@ -205,29 +204,58 @@ module.exports = function (app) {
         const lines = message.split("\n");
         let addedNpcs = [];
         for (const line of lines) {
-            if (!line.startsWith('💣')) {
-                continue;
-            }
-
             const npcLocation = line.split(': 📟');
             if (npcLocation.length !== 2) {
                 continue;
             }
 
             const npcNamePart = npcLocation[0];
-            const deviceCode = npcLocation[1];
-
-            const foundNpcs = await app.repository.npc.getAllByNamePart(`%${npcNamePart}`);
-            if (foundNpcs.length !== 1) {
+            if (!checkNpcPrefix(npcNamePart)) {
                 continue;
             }
 
-            const npcName = foundNpcs[0].name;
-            await app.dbUtil.dbPusher.pushUsers([foundNpcs[0].name], deviceCode, announceMessage.date * 1000, vkUserId, false);
-            addedNpcs.push(foundNpcs[0].name);
+            const deviceCode = npcLocation[1];
+
+            const foundNpc = await app.repository.npc.getOneByName(npcNamePart);
+            if (foundNpc === null) {
+                continue;
+            }
+
+            const npcName = foundNpc.name;
+            await app.dbUtil.dbPusher.pushUsers([npcName], deviceCode, announceMessage.date * 1000, vkUserId, false);
+            addedNpcs.push(foundNpc.name);
+        }
+
+        if (addedNpcs.length === 0) {
+            return null;
         }
 
         return `Координаты пользователей ${addedNpcs.join(', ')} сохранены`;
+    }
+
+    function getNpcPrefix(npcName) {
+        const npcPrefixes = [
+            '🎯',
+            '⚔',
+            '🤖',
+            '🚨',
+            '⚖',
+            '👀',
+            '🚸',
+            '🛂',
+        ];
+
+        for (prefix of npcPrefixes) {
+            if (npcName.startsWith(prefix)) {
+                return prefix;
+            }
+        }
+
+        return null;
+    }
+
+    function checkNpcPrefix(npcName) {
+        return getNpcPrefix(npcName) !== null;
     }
 
     async function sendDevicesToVhackInfo(userId, message, timestamp) {
@@ -253,7 +281,24 @@ module.exports = function (app) {
                 apiDTO.device_info.users = parseInt(lineComponents[1]);
             }
 
-            // npc: # 0 - неизвестен, 1 - смотрит (на 00), 2 - босс (старый), 3 - торговец, 4 - отслеживаемый, 5 — наёмник, 6 — ботнет, 7 — нарушитель
+            // npc:
+            // 0 - неизвестен
+            // 1 - наблюдатель (на 00)
+            // 2 - босс (старый)
+            // 3 - торговец
+            // 4 - отслеживаемый
+            // 5 — наёмник
+            // 6 — ботнет
+            // 7 — нарушитель
+            // 8 — инспектор
+            if (line.startsWith('🛂')) {
+                apiDTO.device_info.npcs.push({
+                    "name": line.substring('🛂'.length),
+                    "npc": 8,
+                    "type": "nu"
+                })
+            }
+
             if (line.startsWith('🚸💣')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🚸'.length),
@@ -270,7 +315,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🚨🧭')) {
+            if (line.startsWith('🚨')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🚨'.length),
                     "npc": 5,
@@ -278,7 +323,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🎯💣')) {
+            if (line.startsWith('🎯')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🎯'.length),
                     "npc": 4,
@@ -287,9 +332,7 @@ module.exports = function (app) {
             }
 
             if (
-                line.startsWith('⚖💣')
-                || line.startsWith('⚖🔸')
-                || line.startsWith('⚖🔺')
+                line.startsWith('⚖')
             ) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('⚖'.length),
@@ -298,7 +341,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('⚔💣')) {
+            if (line.startsWith('⚔')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('⚔'.length),
                     "npc": 2,
