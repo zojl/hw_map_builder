@@ -238,6 +238,7 @@ module.exports = function (app) {
             '🎯💣',
             '⚔💣',
             '🤖💣',
+            '🚨💣',
             '🚨🧭',
             '⚖',
             '👀',
@@ -311,7 +312,10 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🚨🧭')) {
+            if (
+                line.startsWith('🚨🧭')
+                || line.startsWith('🚨💣')
+            ) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🚨'.length),
                     "npc": 5,
