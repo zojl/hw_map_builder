@@ -244,6 +244,8 @@ module.exports = function (app) {
             '👀',
             '🚸💣',
             '🛂',
+            '📊',
+            '🔰',
         ];
 
         for (prefix of npcPrefixes) {
@@ -267,7 +269,7 @@ module.exports = function (app) {
             const lineComponents = line.split(' ');
 
             if (line.startsWith('📟Устройство: ')) {
-                apiDTO.device_info.device = parseInt(line.substring(line.length - 8), 16);
+                apiDTO.device_info.device = line.substring(line.length - 8);
             }
 
             if (line.startsWith('👥Союзники: ')) {
@@ -288,6 +290,25 @@ module.exports = function (app) {
             // 6 — ботнет
             // 7 — нарушитель
             // 8 — инспектор
+            // 9 - информатор
+            // 10 - сисадмин
+
+            if (line.startsWith('🔰')) {
+                apiDTO.device_info.npcs.push({
+                    "name": line.substring('🔰'.length),
+                    "npc": 10,
+                    "type": "nu"
+                })
+            }
+
+            if (line.startsWith('📊')) {
+                apiDTO.device_info.npcs.push({
+                    "name": line.substring('📊'.length),
+                    "npc": 9,
+                    "type": "nu"
+                })
+            }
+
             if (line.startsWith('🛂')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🛂'.length),
@@ -368,7 +389,7 @@ module.exports = function (app) {
                 connectionsLine !== null
                 && line.startsWith('📟')
             ) {
-                apiDTO.device_info.devices.push(parseInt(line.match(/[A-F0-9]{8}/)[0], 16));
+                apiDTO.device_info.devices.push(line.match(/[A-F0-9]{8}/)[0]);
             }
         }
 
@@ -391,7 +412,7 @@ module.exports = function (app) {
         }
         const bossLocation = message.text.substring(message.text.length - 8);
 
-        apiDTO.npc_info.device = parseInt(bossLocation, 16);
+        apiDTO.npc_info.device = bossLocation;
         apiDTO.npc_info.name = bossName;
         apiDTO.npc_info.npc = 4;
 
