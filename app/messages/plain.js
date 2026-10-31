@@ -296,7 +296,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🚸💣')) {
+            if (line.startsWith('🚸')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🚸'.length),
                     "npc": 7,
@@ -304,7 +304,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🤖💣')) {
+            if (line.startsWith('🤖')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🤖'.length),
                     "npc": 6,
@@ -313,8 +313,7 @@ module.exports = function (app) {
             }
 
             if (
-                line.startsWith('🚨🧭')
-                || line.startsWith('🚨💣')
+                line.startsWith('🚨')
             ) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🚨'.length),
@@ -323,7 +322,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('🎯💣')) {
+            if (line.startsWith('🎯')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('🎯'.length),
                     "npc": 4,
@@ -332,9 +331,7 @@ module.exports = function (app) {
             }
 
             if (
-                line.startsWith('⚖💣')
-                || line.startsWith('⚖🔸')
-                || line.startsWith('⚖🔺')
+                line.startsWith('⚖')
             ) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('⚖'.length),
@@ -343,7 +340,7 @@ module.exports = function (app) {
                 })
             }
 
-            if (line.startsWith('⚔💣')) {
+            if (line.startsWith('⚔')) {
                 apiDTO.device_info.npcs.push({
                     "name": line.substring('⚔'.length),
                     "npc": 2,
