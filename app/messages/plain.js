@@ -233,39 +233,36 @@ module.exports = function (app) {
         return `Координаты пользователей ${addedNpcs.join(', ')} сохранены`;
     }
 
+    const npcPrefixes = [
+        {prefix: '🔰', npc: 10}, // сисадмин
+        {prefix: '📊', npc: 9},  // информатор
+        {prefix: '🛂', npc: 8},  // инспектор
+        {prefix: '🚸', npc: 7},  // нарушитель
+        {prefix: '🤖', npc: 6},  // ботнет
+        {prefix: '🚨', npc: 5},  // наёмник
+        {prefix: '🎯', npc: 4},  // отслеживаемый
+        {prefix: '⚖', npc: 3},  // торговец
+        {prefix: '⚔', npc: 2},  // босс (старый)
+        {prefix: '👀', npc: 1},  // наблюдатель (на 00)
+    ];
+
     function checkNpcPrefix(npcName) {
-        const npcPrefixes = [
-            '🎯💣',
-            '⚔💣',
-            '🤖💣',
-            '🚨💣',
-            '🚨🧭',
-            '⚖',
-            '👀',
-            '🚸💣',
-            '🛂',
-            '📊',
-            '🔰',
-        ];
-
-        for (prefix of npcPrefixes) {
-            if (npcName.startsWith(prefix)) {
-                return true;
-            }
-        }
-
-        return false;
+        return npcPrefixes.some(({prefix}) => npcName.startsWith(prefix));
     }
+
+    const sectionHeaders = {
+        '📍Пользователи:': 'users',
+        '🌐Подключения:': 'connections',
+    };
 
     async function sendDevicesToVhackInfo(userId, message, timestamp) {
         let apiDTO = extend({}, app.service.vHackApi.getDeviceDTO());
         apiDTO.ident = userId;
         apiDTO.timestamp = timestamp;
 
-        let connectionsLine = null;
+        let currentSection = null;
         const lines = message.split('\n')
-        for (const index in lines) {
-            const line = lines[index];
+        for (const line of lines) {
             const lineComponents = line.split(' ');
 
             if (line.startsWith('📟Устройство: ')) {
@@ -280,112 +277,30 @@ module.exports = function (app) {
                 apiDTO.device_info.users = parseInt(lineComponents[1]);
             }
 
-            // npc:
-            // 0 - неизвестен
-            // 1 - наблюдатель (на 00)
-            // 2 - босс (старый)
-            // 3 - торговец
-            // 4 - отслеживаемый
-            // 5 — наёмник
-            // 6 — ботнет
-            // 7 — нарушитель
-            // 8 — инспектор
-            // 9 - информатор
-            // 10 - сисадмин
-
-            if (line.startsWith('🔰')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('🔰'.length),
-                    "npc": 10,
-                    "type": "nu"
-                })
+            if (line === '') {
+                currentSection = null;
+                continue;
             }
 
-            if (line.startsWith('📊')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('📊'.length),
-                    "npc": 9,
-                    "type": "nu"
-                })
+            if (sectionHeaders[line]) {
+                currentSection = sectionHeaders[line];
+                continue;
             }
 
-            if (line.startsWith('🛂')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('🛂'.length),
-                    "npc": 8,
-                    "type": "nu"
-                })
+            if (currentSection === 'users') {
+                for (const {prefix, npc} of npcPrefixes) {
+                    if (line.startsWith(prefix)) {
+                        apiDTO.device_info.npcs.push({
+                            "name": line.substring(prefix.length),
+                            "npc": npc,
+                            "type": "nu"
+                        });
+                        break;
+                    }
+                }
             }
 
-            if (line.startsWith('🚸')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('🚸'.length),
-                    "npc": 7,
-                    "type": "nu"
-                })
-            }
-
-            if (line.startsWith('🤖')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('🤖'.length),
-                    "npc": 6,
-                    "type": "nu"
-                })
-            }
-
-            if (
-                line.startsWith('🚨')
-            ) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('🚨'.length),
-                    "npc": 5,
-                    "type": "nu"
-                })
-            }
-
-            if (line.startsWith('🎯')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('🎯'.length),
-                    "npc": 4,
-                    "type": "nu"
-                })
-            }
-
-            if (
-                line.startsWith('⚖')
-            ) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('⚖'.length),
-                    "npc": 3,
-                    "type": "nu"
-                })
-            }
-
-            if (line.startsWith('⚔')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('⚔'.length),
-                    "npc": 2,
-                    "type": "nu"
-                })
-            }
-
-            if (line.startsWith('👀')) {
-                apiDTO.device_info.npcs.push({
-                    "name": line.substring('👀'.length),
-                    "npc": 1,
-                    "type": "nu"
-                })
-            }
-
-
-            if (line === '🌐Подключения:') {
-                connectionsLine = index;
-            }
-
-            if (
-                connectionsLine !== null
-                && line.startsWith('📟')
-            ) {
+            if (currentSection === 'connections' && line.startsWith('📟')) {
                 apiDTO.device_info.devices.push(line.match(/[A-F0-9]{8}/)[0]);
             }
         }
