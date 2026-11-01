@@ -106,30 +106,26 @@ module.exports = function (app) {
             let device = lines[0].substring(lines[0].length - 8);
             let connections = [];
             let users = [];
-            let foundConnection = false;
-            let foundUsers = false;
+            let currentSection = null;
             for (const line of lines) {
-                if (foundConnection) {
-                    if (line.startsWith('📟')) {
-                        connections.push(line.substring(2,10));
-
-                        continue;
-                    }
+                if (line === '') {
+                    currentSection = null;
+                    continue;
                 }
 
-                if (foundUsers) {
-                    if (checkNpcPrefix(line)) {
-                        users.push(line);
-                        continue;
-                    }
+                if (sectionHeaders[line]) {
+                    currentSection = sectionHeaders[line];
+                    continue;
                 }
 
-                if (line === '🌐Подключения:') {
-                    foundConnection = true;
+                if (currentSection === 'connections' && line.startsWith('📟')) {
+                    connections.push(line.substring(2, 10));
+                    continue;
                 }
 
-                if (line === '📍Пользователи:') {
-                    foundUsers = true;
+                if (currentSection === 'users' && checkNpcPrefix(line)) {
+                    users.push(line);
+                    continue;
                 }
             }
 
