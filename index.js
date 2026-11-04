@@ -60,29 +60,7 @@ app.service.vHackApi = require('./app/service/vHackApi.js')(app);
 app.service.statBotImporter = require('./app/service/statBotImporter.js')(app);
 app.service.npcNotifier = require('./app/service/npcNotifier.js')(app);
 
-app.getDates = function(dayOffset = 0) {
-  const now = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);
-  const start = new Date(now.getFullYear(), 0, 0);
-  const diff = (now - start) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
-  const oneDay = 1000 * 60 * 60 * 24;
-  const year = now.getYear();
-  let day = Math.floor(diff / oneDay);
-  let dayOfMonth = now.getDate();
-  if (now.getHours() < 18) {
-    day--;
-
-    if (dayOfMonth === 1) {
-      dayOfMonth = -1;
-    } else {
-      dayOfMonth--;
-    }
-  }
-
-  return {
-    "day": (year * 1000) + day,
-    "dayOfMonth": dayOfMonth,
-  }
-}
+app.getDates = require('./app/util/dates.js');
 
 app.getChatFromMessage = async function(ctx) {
   const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
@@ -126,7 +104,6 @@ require('./app/messages/cycle.js')(app);
 require('./app/messages/find.js')(app);
 require('./app/messages/npc.js')(app);
 require('./app/messages/subscribe.js')(app);
-require('./app/messages/copylinks.js')(app);
 
 require('./app/messages/chat.js')(app);
 
