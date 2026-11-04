@@ -63,7 +63,7 @@ module.exports = function(sequelize, models) {
             }
         });
 
-        if (deviceEntity === null || deviceEntities.length == 0) {
+        if (deviceEntities === null || deviceEntities.length == 0) {
             return [];
         }
 

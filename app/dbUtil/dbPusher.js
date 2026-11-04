@@ -86,6 +86,39 @@ module.exports = function(sequelize, models) {
     return true;
   }
 
+  const copyConnections = async function(connections, toDay) {
+    let copied = 0;
+    let skipped = 0;
+
+    for (const connection of connections) {
+      const existing = await models.connections.findOne({
+        where: {
+          source: connection.source,
+          target: connection.target,
+          subnet: connection.subnet,
+          day: toDay
+        }
+      });
+
+      if (existing !== null) {
+        skipped++;
+        continue;
+      }
+
+      await models.connections.create({
+        source: connection.source,
+        target: connection.target,
+        subnet: connection.subnet,
+        day: toDay,
+        cost: connection.cost,
+        reverseCost: connection.reverseCost,
+      });
+      copied++;
+    }
+
+    return { copied, skipped };
+  }
+
   const pushUsers = async function(users, deviceFull, messageDate, vkUser, isHit) {
     const subnetCode = deviceFull.substr(0, 6);
     const deviceCode = deviceFull.substr(deviceFull.length - 2, 2);
@@ -117,6 +150,7 @@ module.exports = function(sequelize, models) {
 
   return {
     pushConnections: pushToDB,
+    copyConnections,
     pushUsers,
   };
 };

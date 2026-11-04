@@ -4,6 +4,7 @@ module.exports = function(sequelize, models) {
         getAllBySourceDayAndSubnet,
         getOneBySourceTargetAndDay,
         getAllByDayAndSubnet,
+        getAllBySourceIdsDayAndSubnet,
     }
 
     async function getAllBySourceDayAndSubnet(sourceId, day, subnetId) {
@@ -53,6 +54,22 @@ module.exports = function(sequelize, models) {
         }
 
         return connectionEntity;
+    }
+
+    async function getAllBySourceIdsDayAndSubnet(sourceIds, day, subnetId) {
+        let connectionEntities = await models.connections.findAll({
+            where: {
+                source: sourceIds,
+                day: day,
+                subnet: subnetId
+            }
+        });
+
+        if (connectionEntities == null || connectionEntities.length == 0) {
+            return [];
+        }
+
+        return connectionEntities;
     }
 
     async function getAllByDayAndSubnet(day, subnetId) {

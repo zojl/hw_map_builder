@@ -60,8 +60,8 @@ app.service.vHackApi = require('./app/service/vHackApi.js')(app);
 app.service.statBotImporter = require('./app/service/statBotImporter.js')(app);
 app.service.npcNotifier = require('./app/service/npcNotifier.js')(app);
 
-app.getDates = function() {
-  const now = new Date();
+app.getDates = function(dayOffset = 0) {
+  const now = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);
   const start = new Date(now.getFullYear(), 0, 0);
   const diff = (now - start) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
   const oneDay = 1000 * 60 * 60 * 24;
@@ -126,6 +126,7 @@ require('./app/messages/cycle.js')(app);
 require('./app/messages/find.js')(app);
 require('./app/messages/npc.js')(app);
 require('./app/messages/subscribe.js')(app);
+require('./app/messages/copylinks.js')(app);
 
 require('./app/messages/chat.js')(app);
 
