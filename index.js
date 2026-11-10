@@ -13,6 +13,13 @@ Sentry.init({
     tracesSampleRate: 1.0,
 });
 
+// Since Node 15 an unhandled rejection kills the process. Command handlers aren't awaited
+// by node-vk-bot-api/express, so any handler error would crash the bot: log it instead.
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled rejection:', reason);
+    Sentry.captureException(reason);
+});
+
 let app = {};
 app.sentry = Sentry;
 app.http = express();
@@ -60,29 +67,7 @@ app.service.vHackApi = require('./app/service/vHackApi.js')(app);
 app.service.statBotImporter = require('./app/service/statBotImporter.js')(app);
 app.service.npcNotifier = require('./app/service/npcNotifier.js')(app);
 
-app.getDates = function() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  const diff = (now - start) + ((start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000);
-  const oneDay = 1000 * 60 * 60 * 24;
-  const year = now.getYear();
-  let day = Math.floor(diff / oneDay);
-  let dayOfMonth = now.getDate();
-  if (now.getHours() < 18) {
-    day--;
-
-    if (dayOfMonth === 1) {
-      dayOfMonth = -1;
-    } else {
-      dayOfMonth--;
-    }
-  }
-
-  return {
-    "day": (year * 1000) + day,
-    "dayOfMonth": dayOfMonth,
-  }
-}
+app.getDates = require('./app/util/dates.js');
 
 app.getChatFromMessage = async function(ctx) {
   const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
@@ -125,6 +110,7 @@ require('./app/messages/link.js')(app);
 require('./app/messages/cycle.js')(app);
 require('./app/messages/find.js')(app);
 require('./app/messages/npc.js')(app);
+require('./app/messages/service.js')(app);
 require('./app/messages/subscribe.js')(app);
 
 require('./app/messages/chat.js')(app);

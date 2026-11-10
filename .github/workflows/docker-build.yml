@@ -1,0 +1,32 @@
+name: Docker build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: hwmap-builder:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check that the app loads
+        run: |
+          docker run --rm hwmap-builder:ci node -e "
+            for (const f of ['./app/messages/plain.js', './app/messages/service.js', './app/dbUtil/dbPusher.js']) require(f);
+            require('sequelize'); require('pg'); require('node-vk-bot-api'); require('@sentry/browser');
+            console.log('node', process.version, 'modules load OK');
+          "
