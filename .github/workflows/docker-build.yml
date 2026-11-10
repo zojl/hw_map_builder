@@ -2,31 +2,68 @@ name: Docker build
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  # Publish only from master and version tags; other branches and PRs just build
+  PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v5
 
       - uses: docker/setup-buildx-action@v3
 
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=ref,event=branch
+            type=ref,event=pr
+
       - name: Build image
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: false
           load: true
-          tags: hwmap-builder:ci
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Check that the app loads
         run: |
-          docker run --rm hwmap-builder:ci node -e "
+          docker run --rm "${{ env.IMAGE }}:sha-${GITHUB_SHA::7}" node -e "
             for (const f of ['./app/messages/plain.js', './app/messages/service.js', './app/dbUtil/dbPusher.js']) require(f);
             require('sequelize'); require('pg'); require('node-vk-bot-api'); require('@sentry/browser');
             console.log('node', process.version, 'modules load OK');
           "
+
+      - name: Log in to GitHub Container Registry
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish image
+        if: env.PUBLISH == 'true'
+        run: |
+          for tag in $(echo "${{ steps.meta.outputs.tags }}"); do
+            docker push "$tag"
+          done
