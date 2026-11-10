@@ -148,9 +148,73 @@ module.exports = function(sequelize, models) {
     }
   }
 
+  async function findOrCreateService(name) {
+    const service = await models.services.findOne({
+      where: {
+        name: name
+      }
+    });
+
+    if (service !== null) {
+      return service;
+    }
+
+    return await models.services.create({
+      name: name
+    });
+  }
+
+  // One location record per service+device+day; re-forwarding only refreshes messageDate
+  const pushServices = async function(services, deviceFull, day, messageDate, vkUser) {
+    const subnetCode = deviceFull.substr(0, 6);
+
+    const subnet = await models.subnets.findOne({
+      where: {
+        code: subnetCode
+      }
+    });
+
+    if (subnet === null) {
+      return false;
+    }
+
+    const device = await findOrCreateDevice(deviceFull);
+
+    for (const name of services) {
+      const service = await findOrCreateService(name);
+      const existing = await models.serviceLocations.findOne({
+        where: {
+          service: service.id,
+          device: device.id,
+          subnet: subnet.id,
+          day: day,
+        }
+      });
+
+      if (existing !== null) {
+        if (existing.messageDate < messageDate) {
+          await existing.update({messageDate: messageDate, vkUser: vkUser});
+        }
+        continue;
+      }
+
+      await models.serviceLocations.create({
+        service: service.id,
+        device: device.id,
+        subnet: subnet.id,
+        day: day,
+        messageDate: messageDate,
+        vkUser: vkUser,
+      });
+    }
+
+    return true;
+  }
+
   return {
     pushConnections: pushToDB,
     copyConnections,
     pushUsers,
+    pushServices,
   };
 };

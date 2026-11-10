@@ -106,6 +106,7 @@ module.exports = function (app) {
             let device = lines[0].substring(lines[0].length - 8);
             let connections = [];
             let users = [];
+            let services = [];
             let currentSection = null;
             for (const line of lines) {
                 if (line === '') {
@@ -113,8 +114,14 @@ module.exports = function (app) {
                     continue;
                 }
 
-                if (sectionHeaders[line]) {
-                    currentSection = sectionHeaders[line];
+                const header = getSectionHeader(line);
+                if (header) {
+                    currentSection = header;
+                    continue;
+                }
+
+                if (currentSection === 'services') {
+                    services.push(line.trim());
                     continue;
                 }
 
@@ -141,6 +148,14 @@ module.exports = function (app) {
                 await app.service.npcNotifier.notifyChats(chatPeerId, users, device, src.date * 1000);
                 const msgUserPlural = (users.length === 1) ? 'пользователя' : 'пользователей';
                 replies.push(`Координаты ${msgUserPlural} ${users.join(', ')} сохранены`);
+            }
+
+            if (services.length > 0) {
+                const saved = await app.dbUtil.dbPusher.pushServices(services, device, day, new Date(src.date * 1000), from);
+                if (saved) {
+                    const msgServicePlural = (services.length === 1) ? 'Сервис' : 'Сервисы';
+                    replies.push(`${msgServicePlural} ${services.join(', ')} на 📟${device} сохранены`);
+                }
             }
 
             if (
@@ -246,10 +261,16 @@ module.exports = function (app) {
         return npcPrefixes.some(({prefix}) => npcName.startsWith(prefix));
     }
 
+    // Keys are stored without U+FE0F: the game may or may not send the emoji variation selector
     const sectionHeaders = {
         '📍Пользователи:': 'users',
         '🌐Подключения:': 'connections',
+        '⚙Сервисы:': 'services',
     };
+
+    function getSectionHeader(line) {
+        return sectionHeaders[line.replace(/️/g, '').trim()] || null;
+    }
 
     async function sendDevicesToVhackInfo(userId, message, timestamp) {
         let apiDTO = extend({}, app.service.vHackApi.getDeviceDTO());
@@ -278,8 +299,9 @@ module.exports = function (app) {
                 continue;
             }
 
-            if (sectionHeaders[line]) {
-                currentSection = sectionHeaders[line];
+            const header = getSectionHeader(line);
+            if (header) {
+                currentSection = header;
                 continue;
             }
 

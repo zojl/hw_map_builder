@@ -103,6 +103,7 @@ require('./app/messages/link.js')(app);
 require('./app/messages/cycle.js')(app);
 require('./app/messages/find.js')(app);
 require('./app/messages/npc.js')(app);
+require('./app/messages/service.js')(app);
 require('./app/messages/subscribe.js')(app);
 
 require('./app/messages/chat.js')(app);
