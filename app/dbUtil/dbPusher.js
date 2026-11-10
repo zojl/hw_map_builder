@@ -164,7 +164,7 @@ module.exports = function(sequelize, models) {
     });
   }
 
-  // One location record per service+device+day; re-forwarding only refreshes messageDate
+  // Every observation is kept (services move, history matters); re-forwarding the same message is skipped
   const pushServices = async function(services, deviceFull, day, messageDate, vkUser) {
     const subnetCode = deviceFull.substr(0, 6);
 
@@ -187,14 +187,11 @@ module.exports = function(sequelize, models) {
           service: service.id,
           device: device.id,
           subnet: subnet.id,
-          day: day,
+          messageDate: messageDate,
         }
       });
 
       if (existing !== null) {
-        if (existing.messageDate < messageDate) {
-          await existing.update({messageDate: messageDate, vkUser: vkUser});
-        }
         continue;
       }
 

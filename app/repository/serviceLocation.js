@@ -1,47 +1,31 @@
 module.exports = function(sequelize, models) {
     return {
-        findLastByServicesAndSubnet,
-        findLastBySubnetAndDay,
+        findRecentMovesBySubnet,
     }
 
-    // Latest known location of each given service in the subnet
-    async function findLastByServicesAndSubnet(serviceIds, subnetId) {
-        if (serviceIds.length === 0) {
-            return [];
-        }
-
-        return await findLast({
-            service: serviceIds,
-            subnet: subnetId,
+    // For every service in the subnet: its last `movesPerService` stays, newest first.
+    // Consecutive observations on the same device are collapsed into one stay,
+    // represented by its latest observation.
+    async function findRecentMovesBySubnet(subnetId, movesPerService) {
+        const [rows] = await sequelize.query(`
+            SELECT service, device, "messageDate"
+            FROM (
+                SELECT stays.*,
+                    ROW_NUMBER() OVER (PARTITION BY service ORDER BY "messageDate" DESC) AS move_number
+                FROM (
+                    SELECT service, device, "messageDate",
+                        LEAD(device) OVER (PARTITION BY service ORDER BY "messageDate", id) AS next_device
+                    FROM "serviceLocations"
+                    WHERE subnet = :subnetId
+                ) stays
+                WHERE next_device IS DISTINCT FROM device
+            ) moves
+            WHERE move_number <= :movesPerService
+            ORDER BY service, "messageDate" DESC
+        `, {
+            replacements: {subnetId, movesPerService},
         });
-    }
 
-    // Latest known location of every service seen in the subnet on the given day
-    async function findLastBySubnetAndDay(subnetId, day) {
-        return await findLast({
-            subnet: subnetId,
-            day: day,
-        });
-    }
-
-    async function findLast(where) {
-        return await models.serviceLocations.findAll({
-            attributes: [
-                sequelize.literal("DISTINCT ON (service) id"),
-                "service",
-                "device",
-                "subnet",
-                "day",
-                "messageDate",
-                "vkUser",
-                "createdAt",
-                "updatedAt",
-            ],
-            where: where,
-            order: [
-                ["service"],
-                ["messageDate", "DESC"],
-            ],
-        });
+        return rows;
     }
 }

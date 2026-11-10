@@ -1,19 +1,19 @@
 module.exports = function(app) {
     app.bot.command('/services', async (ctx) => {
-        await handleService(ctx);
+        await handleServices(ctx);
     });
 
     app.bot.command('/service', async (ctx) => {
-        await handleService(ctx);
+        await handleServices(ctx);
     });
 
     app.bot.command('/svc', async (ctx) => {
-        await handleService(ctx);
+        await handleServices(ctx);
     });
 
-    const maxResults = 50;
+    const movesPerService = 3;
 
-    const handleService = async (ctx) => {
+    const handleServices = async (ctx) => {
         const chat = await app.getChatFromMessage(ctx);
         if (chat === null) {
             return;
@@ -23,63 +23,89 @@ module.exports = function(app) {
             return;
         }
 
-        const today = app.getDates().day;
-        const namePart = ctx.message.text.split(' ').slice(1).join(' ').trim();
+        const args = ctx.message.text.split(' ');
+        let sourceDevice = null;
+        if (args.length >= 2) {
+            sourceDevice = await app.repository.device.getOneByCode(args[1]);
+            if (sourceDevice === null) {
+                ctx.reply('Такого устройства нет в базе: не встречалось ещё никому за время ивента.');
+                return;
+            }
+        }
 
-        if (namePart === '') {
-            await replyAllToday(ctx, subnet, today);
+        const moves = await app.repository.serviceLocation.findRecentMovesBySubnet(subnet.id, movesPerService);
+        if (moves.length === 0) {
+            ctx.reply('В этой подсети ещё не встречалось ни одного сервиса.');
             return;
         }
 
-        const services = await app.repository.service.getAllByNamePart(namePart);
-        if (services.length === 0) {
-            ctx.reply('Я не знаю сервисов с таким названием.');
-            return;
+        const serviceIds = [...new Set(moves.map((move) => move.service))];
+        const deviceIds = [...new Set(moves.map((move) => move.device))];
+        const services = await app.repository.service.getAllByIds(serviceIds);
+        const deviceCodes = await app.repository.device.getCodesByIds(deviceIds);
+
+        const movesByService = {};
+        for (const move of moves) {
+            if (typeof(movesByService[move.service]) === 'undefined') {
+                movesByService[move.service] = [];
+            }
+            movesByService[move.service].push(move);
         }
 
-        const serviceNames = {};
+        const day = app.getDates().day;
+        const delimiter = chat.delimiter ? chat.delimiter : ' → ';
+        const now = new Date();
+        const parts = [];
+
         for (const service of services) {
-            serviceNames[service.id] = service.name;
+            const serviceMoves = movesByService[service.id];
+            const [last, ...previous] = serviceMoves;
+            const lastCode = deviceCodes[last.device];
+
+            let part = `${service.name}: 📟${lastCode} (${formatAge(now, new Date(last.messageDate))})`;
+
+            if (previous.length > 0) {
+                const previousReadable = previous
+                    .map((move) => `📟${deviceCodes[move.device]} (${formatAge(now, new Date(move.messageDate))})`)
+                    .join(', ');
+                part += `\nранее: ${previousReadable}`;
+            }
+
+            if (sourceDevice !== null) {
+                const route = await app.dbUtil.pgroute.getRoute(sourceDevice.code, lastCode, day, subnet.id);
+                if (route === null || route.length === 0) {
+                    part += `\nНе удаётся построить путь от ${sourceDevice.code} до ${lastCode}`;
+                } else {
+                    part += `\n⚡${route.length - 1}: ${route.join(delimiter)}`;
+                }
+            }
+
+            parts.push({name: service.name, text: part});
         }
 
-        const locations = await app.repository.serviceLocation.findLastByServicesAndSubnet(Object.keys(serviceNames), subnet.id);
-        if (locations.length === 0) {
-            ctx.reply('Сервисы с таким названием в этой подсети ещё не встречались.');
-            return;
-        }
-
-        const lines = await formatLocations(locations, serviceNames, today);
-        ctx.reply('Последние известные места сервисов:\n' + lines);
+        parts.sort((a, b) => a.name.localeCompare(b.name));
+        const separator = sourceDevice !== null || parts.some((part) => part.text.includes('\n')) ? '\n\n' : '\n';
+        ctx.reply('Известные сервисы:\n' + parts.map((part) => part.text).join(separator));
     }
 
-    async function replyAllToday(ctx, subnet, today) {
-        const locations = await app.repository.serviceLocation.findLastBySubnetAndDay(subnet.id, today);
-        if (locations.length === 0) {
-            ctx.reply('Сегодня в этой подсети ещё не встречалось ни одного сервиса. Для поиска по названию: /service pasta');
-            return;
+    function formatAge(now, date) {
+        const minutes = Math.max(0, Math.floor((now - date) / 60000));
+        if (minutes < 1) {
+            return 'только что';
         }
 
-        const serviceNames = {};
-        for (const location of locations) {
-            const service = await app.repository.service.getOneById(location.service);
-            serviceNames[location.service] = service.name;
+        if (minutes < 60) {
+            return `${minutes} мин. назад`;
         }
 
-        const lines = await formatLocations(locations, serviceNames, today);
-        ctx.reply('Сервисы, замеченные сегодня:\n' + lines);
-    }
-
-    async function formatLocations(locations, serviceNames, today) {
-        const lines = [];
-        for (const location of locations) {
-            const device = await app.repository.device.getOneById(location.device);
-            const time = location.messageDate.toLocaleTimeString('ru-RU', {month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'});
-            const staleMark = location.day === today ? '' : ' (не сегодня)';
-            lines.push(`${serviceNames[location.service]}: 📟${device.code} — ${time}${staleMark}`);
+        if (minutes < 24 * 60) {
+            const hours = Math.floor(minutes / 60);
+            const restMinutes = minutes % 60;
+            return restMinutes === 0
+                ? `${hours} ч. назад`
+                : `${hours} ч. ${restMinutes} мин. назад`;
         }
 
-        lines.sort();
-        const more = lines.length > maxResults ? `\n…и ещё ${lines.length - maxResults}` : '';
-        return lines.slice(0, maxResults).join('\n') + more;
+        return date.toLocaleString('ru-RU', {day: 'numeric', month: 'numeric', hour: 'numeric', minute: 'numeric'});
     }
 }
