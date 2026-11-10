@@ -1,6 +1,7 @@
 module.exports = function(sequelize, models) {
     return {
         findLastByServicesAndSubnet,
+        findLastBySubnetAndDay,
     }
 
     // Latest known location of each given service in the subnet
@@ -9,6 +10,21 @@ module.exports = function(sequelize, models) {
             return [];
         }
 
+        return await findLast({
+            service: serviceIds,
+            subnet: subnetId,
+        });
+    }
+
+    // Latest known location of every service seen in the subnet on the given day
+    async function findLastBySubnetAndDay(subnetId, day) {
+        return await findLast({
+            subnet: subnetId,
+            day: day,
+        });
+    }
+
+    async function findLast(where) {
         return await models.serviceLocations.findAll({
             attributes: [
                 sequelize.literal("DISTINCT ON (service) id"),
@@ -21,10 +37,7 @@ module.exports = function(sequelize, models) {
                 "createdAt",
                 "updatedAt",
             ],
-            where: {
-                service: serviceIds,
-                subnet: subnetId,
-            },
+            where: where,
             order: [
                 ["service"],
                 ["messageDate", "DESC"],

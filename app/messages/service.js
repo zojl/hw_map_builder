@@ -1,4 +1,8 @@
 module.exports = function(app) {
+    app.bot.command('/services', async (ctx) => {
+        await handleService(ctx);
+    });
+
     app.bot.command('/service', async (ctx) => {
         await handleService(ctx);
     });
@@ -7,7 +11,7 @@ module.exports = function(app) {
         await handleService(ctx);
     });
 
-    const maxResults = 20;
+    const maxResults = 50;
 
     const handleService = async (ctx) => {
         const chat = await app.getChatFromMessage(ctx);
@@ -19,9 +23,11 @@ module.exports = function(app) {
             return;
         }
 
+        const today = app.getDates().day;
         const namePart = ctx.message.text.split(' ').slice(1).join(' ').trim();
+
         if (namePart === '') {
-            ctx.reply('Укажи часть названия сервиса, например /service pasta');
+            await replyAllToday(ctx, subnet, today);
             return;
         }
 
@@ -42,7 +48,28 @@ module.exports = function(app) {
             return;
         }
 
-        const today = app.getDates().day;
+        const lines = await formatLocations(locations, serviceNames, today);
+        ctx.reply('Последние известные места сервисов:\n' + lines);
+    }
+
+    async function replyAllToday(ctx, subnet, today) {
+        const locations = await app.repository.serviceLocation.findLastBySubnetAndDay(subnet.id, today);
+        if (locations.length === 0) {
+            ctx.reply('Сегодня в этой подсети ещё не встречалось ни одного сервиса. Для поиска по названию: /service pasta');
+            return;
+        }
+
+        const serviceNames = {};
+        for (const location of locations) {
+            const service = await app.repository.service.getOneById(location.service);
+            serviceNames[location.service] = service.name;
+        }
+
+        const lines = await formatLocations(locations, serviceNames, today);
+        ctx.reply('Сервисы, замеченные сегодня:\n' + lines);
+    }
+
+    async function formatLocations(locations, serviceNames, today) {
         const lines = [];
         for (const location of locations) {
             const device = await app.repository.device.getOneById(location.device);
@@ -52,8 +79,7 @@ module.exports = function(app) {
         }
 
         lines.sort();
-        const shown = lines.slice(0, maxResults);
         const more = lines.length > maxResults ? `\n…и ещё ${lines.length - maxResults}` : '';
-        ctx.reply('Последние известные места сервисов:\n' + shown.join('\n') + more);
+        return lines.slice(0, maxResults).join('\n') + more;
     }
 }
