@@ -13,6 +13,13 @@ Sentry.init({
     tracesSampleRate: 1.0,
 });
 
+// Since Node 15 an unhandled rejection kills the process. Command handlers aren't awaited
+// by node-vk-bot-api/express, so any handler error would crash the bot: log it instead.
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled rejection:', reason);
+    Sentry.captureException(reason);
+});
+
 let app = {};
 app.sentry = Sentry;
 app.http = express();

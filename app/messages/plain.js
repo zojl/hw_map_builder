@@ -1,6 +1,4 @@
 module.exports = function (app) {
-    const extend = require('util')._extend;
-
     app.bot.on(async ctx => {
         let dates = app.getDates();
         const msg = ctx.message;
@@ -273,7 +271,7 @@ module.exports = function (app) {
     }
 
     async function sendDevicesToVhackInfo(userId, message, timestamp) {
-        let apiDTO = extend({}, app.service.vHackApi.getDeviceDTO());
+        let apiDTO = {...app.service.vHackApi.getDeviceDTO()};
         apiDTO.ident = userId;
         apiDTO.timestamp = timestamp;
 
