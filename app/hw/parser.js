@@ -133,6 +133,17 @@ function npcTypeEmoji(type) {
     return emojiById(npcTypes, type);
 }
 
+// Human-readable labels for summaries, e.g. "🎯 отслеживаемый", "💣 H4rdF0rk"
+function npcTypeLabel(type) {
+    const entry = npcTypes.find((item) => item.id === type);
+    return entry ? `${entry.emoji} ${entry.title}` : 'неизвестный';
+}
+
+function teamLabel(team) {
+    const entry = teams.find((item) => item.id === team);
+    return entry ? `${entry.emoji} ${entry.title}` : 'нет';
+}
+
 function toKey(name) {
     return name.trim().toLowerCase();
 }
@@ -156,6 +167,8 @@ module.exports = {
     formatNpc,
     formatService,
     npcTypeEmoji,
+    npcTypeLabel,
+    teamLabel,
     toKey,
     lookupKeys,
 };
