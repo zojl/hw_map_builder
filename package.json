@@ -7,13 +7,15 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "copylinks": "node scripts/copylinks.js",
     "migrate-names": "node scripts/migrate-names.js",
-    "map-link-owner": "node scripts/map-link-owner.js"
+    "map-link-owner": "node scripts/map-link-owner.js",
+    "build": "esbuild app/web/client/map3d.mjs --bundle --minify --format=iife --target=es2020 --outfile=app/web/public/build/map3d.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@sentry/browser": "^7.34.0",
     "@sentry/tracing": "^7.34.0",
+    "3d-force-graph": "^1.80.2",
     "body-parser": "^1.20.2",
     "cytoscape": "^3.35.0",
     "dotenv": "^16.0.3",
@@ -22,6 +24,10 @@
     "node-vk-bot-api": "^3.5.0",
     "pg": "^8.8.0",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.28.0"
+    "sequelize": "^6.28.0",
+    "three-spritetext": "^1.10.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

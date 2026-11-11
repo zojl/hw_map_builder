@@ -10,6 +10,8 @@ module.exports = function(app) {
         'cytoscape.min.js': require.resolve('cytoscape/dist/cytoscape.min.js'),
         'stress-layout.js': path.join(__dirname, 'public', 'stress-layout.js'),
         'map-page.js': path.join(__dirname, 'public', 'map-page.js'),
+        // Built by `npm run build` (the Docker image does it): three.js and the 3D view
+        'map3d.js': path.join(__dirname, 'public', 'build', 'map3d.js'),
     };
 
     // Scripts only, no data: safe to cache and to serve without a token
@@ -21,7 +23,11 @@ module.exports = function(app) {
         }
 
         res.set({'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff'});
-        res.type('application/javascript').sendFile(file);
+        res.type('application/javascript').sendFile(file, (error) => {
+            if (error && !res.headersSent) {
+                res.status(404).end();
+            }
+        });
     });
 
     app.http.get('/map/:token', async (req, res) => {
@@ -114,20 +120,31 @@ function renderMap({subnetCode, links, generatedAt}) {
     <h1>Подсеть ${escape(subnetCode)}</h1>
     <p class="meta">Снимок на ${escape(time)} · исследовано ${explored} из ${graph.nodes.length} · связей ${graph.edges.length}</p>
   </div>
+  <div class="modes" role="group" aria-label="Вид">
+    <button type="button" data-mode-button="2d" aria-pressed="true">2D</button>
+    <button type="button" data-mode-button="3d" aria-pressed="false">3D</button>
+  </div>
   <form id="search" class="search" autocomplete="off">
     <input id="search-code" type="text" inputmode="text" maxlength="8" placeholder="Код, например A7" aria-label="Найти устройство">
     <button type="submit">Найти</button>
     <button type="button" id="fit">Весь граф</button>
   </form>
-  <ul class="legend">
+  <ul class="legend legend-2d">
     <li><span class="dot explored"></span>исследовано</li>
     <li><span class="dot seen"></span>видели только как связь</li>
     <li><span class="line"></span>связь в обе стороны</li>
     <li><span class="line oneway"></span>известна с одной стороны</li>
   </ul>
+  <ul class="legend legend-3d">
+    <li><span class="dot ranges"></span>цвет — диапазон (0x, 1x, …)</li>
+    <li><span class="dot pale"></span>бледные — видели только как связь</li>
+    <li><span class="line"></span>связь в обе стороны</li>
+    <li><span class="line oneway-3d"></span>известна с одной стороны</li>
+  </ul>
   <p id="info" class="info">Нажми на устройство, чтобы выделить его соседей.</p>
 </header>
-<main id="graph" aria-label="Граф устройств подсети ${escape(subnetCode)}"></main>
+<main id="graph" aria-label="Граф устройств подсети ${escape(subnetCode)}" hidden></main>
+<main id="graph3d" aria-label="Граф устройств подсети ${escape(subnetCode)} в 3D" hidden></main>
 ${graph.nodes.length === 0 ? '<p class="empty">За этот игровой день связей ещё нет.</p>' : ''}
 <script type="application/json" id="graph-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
 <script src="/map-assets/cytoscape.min.js"></script>
@@ -184,7 +201,19 @@ h1 { margin: 0; font-size: 20px; }
 .line { width: 22px; border-top: 2px solid var(--edge); }
 .line.oneway { border-top-style: dashed; }
 .info { flex-basis: 100%; margin: 0; min-height: 1.4em; font-size: 14px; font-variant-numeric: tabular-nums; }
-#graph { flex: 1; min-height: 0; width: 100%; overflow: hidden; }
+#graph, #graph3d { flex: 1; min-height: 0; width: 100%; overflow: hidden; }
+#graph[hidden], #graph3d[hidden] { display: none; }
+.modes { display: flex; flex: 0 0 auto; }
+.modes button { font: inherit; font-size: 14px; padding: 5px 12px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+.modes button:first-child { border-radius: 6px 0 0 6px; }
+.modes button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.modes button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.legend-3d { display: none; }
+body[data-mode="3d"] .legend-2d { display: none; }
+body[data-mode="3d"] .legend-3d { display: flex; }
+.dot.ranges { background: conic-gradient(hsl(0, 55%, 45%), hsl(120, 55%, 45%), hsl(240, 55%, 45%), hsl(360, 55%, 45%)); }
+.dot.pale { background: hsl(200, 55%, 45%); opacity: 0.5; }
+.line.oneway-3d { border-top-color: rgb(240, 150, 60); }
 .empty { position: absolute; top: 50%; left: 0; right: 0; text-align: center; color: var(--muted); }
 .message { margin: auto; padding: 16px; text-align: center; font-size: 17px; }
 </style>
