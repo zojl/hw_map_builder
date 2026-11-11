@@ -47,6 +47,15 @@ module.exports = function(app) {
             npcNames[npc.id] = npc.name;
         }
 
+        // Observations may reference NPCs deleted from npcs long ago: show them as deleted
+        for (const summary of summaries) {
+            if (typeof(npcNames[summary.npc]) === 'undefined') {
+                const title = `${summary.raw || `NPC #${summary.npc}`} (удалён)`;
+                npcNames[summary.npc] = title;
+                summary.raw = title;
+            }
+        }
+
         const changesByNpc = {};
         for (const change of changes) {
             changesByNpc[change.npc] = changesByNpc[change.npc] || [];
