@@ -23,6 +23,11 @@ module.exports = function(app) {
             return;
         }
 
+        if (!chat.canSeeNpc) {
+            ctx.reply('Эта команда не разрешена в этом чате.');
+            return;
+        }
+
         const args = ctx.message.text.split(' ');
         let sourceDevice = null;
         if (args.length >= 2) {
@@ -62,7 +67,8 @@ module.exports = function(app) {
             const [last, ...previous] = serviceMoves;
             const lastCode = deviceCodes[last.device];
 
-            let part = `${service.name}: 📟${lastCode} (${formatAge(now, new Date(last.messageDate))})`;
+            // The latest observation as the game showed it (type and team may change)
+            let part = `${last.raw || service.name}: 📟${lastCode} (${formatAge(now, new Date(last.messageDate))})`;
 
             if (previous.length > 0) {
                 const previousReadable = previous

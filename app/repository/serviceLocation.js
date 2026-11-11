@@ -8,12 +8,12 @@ module.exports = function(sequelize, models) {
     // represented by its latest observation.
     async function findRecentMovesBySubnet(subnetId, movesPerService) {
         const [rows] = await sequelize.query(`
-            SELECT service, device, "messageDate"
+            SELECT service, device, "messageDate", raw
             FROM (
                 SELECT stays.*,
                     ROW_NUMBER() OVER (PARTITION BY service ORDER BY "messageDate" DESC) AS move_number
                 FROM (
-                    SELECT service, device, "messageDate",
+                    SELECT service, device, "messageDate", raw,
                         LEAD(device) OVER (PARTITION BY service ORDER BY "messageDate", id) AS next_device
                     FROM "serviceLocations"
                     WHERE subnet = :subnetId
