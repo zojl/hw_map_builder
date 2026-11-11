@@ -115,6 +115,7 @@ require('./app/messages/history.js')(app);
 require('./app/messages/service.js')(app);
 require('./app/messages/subscribe.js')(app);
 require('./app/messages/map.js')(app);
+require('./app/messages/matrix.js')(app);
 
 require('./app/messages/chat.js')(app);
 
