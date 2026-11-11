@@ -1,15 +1,14 @@
 const path = require('path');
 
 // GET /map/<token>: a snapshot of the chat's subnet for the current game day, drawn as a graph
-// by app/web/public/map-page.js (Cytoscape.js + fcose layout, served from node_modules by us).
+// by app/web/public/map-page.js: Cytoscape.js (served from node_modules by us) for drawing,
+// app/web/public/stress-layout.js for placing devices.
 // Access: the token (app/service/mapLink.js) names the chat; subnet and day are resolved here,
 // at opening time, never taken from the URL. Only devices and links are shown for now.
 module.exports = function(app) {
     const assets = {
         'cytoscape.min.js': require.resolve('cytoscape/dist/cytoscape.min.js'),
-        'layout-base.js': require.resolve('layout-base/layout-base.js'),
-        'cose-base.js': require.resolve('cose-base/cose-base.js'),
-        'cytoscape-fcose.js': require.resolve('cytoscape-fcose/cytoscape-fcose.js'),
+        'stress-layout.js': path.join(__dirname, 'public', 'stress-layout.js'),
         'map-page.js': path.join(__dirname, 'public', 'map-page.js'),
     };
 
@@ -60,7 +59,7 @@ module.exports = function(app) {
             .filter((connection) => codes[connection.source] && codes[connection.target])
             .map((connection) => ({source: codes[connection.source], target: codes[connection.target]}));
 
-        send(res, 200, renderMap({subnetCode: subnet.code, day, links, generatedAt: new Date()}));
+        send(res, 200, renderMap({subnetCode: subnet.code, links, generatedAt: new Date()}));
     }
 
     function sendMessage(res, status, message) {
@@ -103,12 +102,11 @@ function buildGraph(links) {
     return {nodes, edges};
 }
 
-function renderMap({subnetCode, day, links, generatedAt}) {
+function renderMap({subnetCode, links, generatedAt}) {
     const graph = buildGraph(links);
     const explored = graph.nodes.filter((node) => node.state === 'explored').length;
     const time = generatedAt.toLocaleString('ru-RU', {day: 'numeric', month: 'numeric', hour: 'numeric', minute: 'numeric'});
-    // Same seed for the same subnet and day: reopening the map keeps the picture familiar
-    const data = {seed: `${subnetCode}:${day}`, ...graph};
+    const data = graph;
 
     const body = `
 <header>
@@ -133,9 +131,7 @@ function renderMap({subnetCode, day, links, generatedAt}) {
 ${graph.nodes.length === 0 ? '<p class="empty">За этот игровой день связей ещё нет.</p>' : ''}
 <script type="application/json" id="graph-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
 <script src="/map-assets/cytoscape.min.js"></script>
-<script src="/map-assets/layout-base.js"></script>
-<script src="/map-assets/cose-base.js"></script>
-<script src="/map-assets/cytoscape-fcose.js"></script>
+<script src="/map-assets/stress-layout.js"></script>
 <script src="/map-assets/map-page.js"></script>`;
 
     return renderPage(`Подсеть ${subnetCode}`, body);

@@ -1,5 +1,5 @@
 // Draws the subnet graph embedded by app/web/map.js. Globals come from the scripts loaded before:
-// cytoscape, and the fcose layout that registers itself in it.
+// cytoscape and stressLayout (stress-layout.js).
 (function() {
     const data = JSON.parse(document.getElementById('graph-data').textContent);
     const container = document.getElementById('graph');
@@ -44,20 +44,12 @@
         ];
     }
 
-    // Seeded Math.random during the layout: the same subnet and day give the same picture
-    function seededRandom(seed) {
-        let h = 1779033703 ^ seed.length;
-        for (let i = 0; i < seed.length; i++) {
-            h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
-            h = (h << 13) | (h >>> 19);
-        }
-        return function() {
-            h = (h + 0x6D2B79F5) | 0;
-            let t = Math.imul(h ^ (h >>> 15), 1 | h);
-            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
-    }
+    // Positions from stress-layout.js: deterministic, so reopening the map gives the same picture
+    const positions = stressLayout(
+        data.nodes.map((node) => node.id),
+        data.edges.map((edge) => [edge.source, edge.target]),
+        80
+    );
 
     const cy = cytoscape({
         container,
@@ -66,30 +58,11 @@
             ...data.edges.map((edge) => ({group: 'edges', data: {...edge, id: edge.source + '-' + edge.target}})),
         ],
         style: style(),
+        layout: {name: 'preset', positions: (node) => positions[node.id()], fit: true, padding: 24},
         minZoom: 0.15,
         maxZoom: 4,
         boxSelectionEnabled: false,
-        autoungrabify: false,
     });
-
-    const random = Math.random;
-    Math.random = seededRandom(data.seed);
-    try {
-        cy.layout({
-            name: 'fcose',
-            quality: 'proof',
-            randomize: true,
-            animate: false,
-            nodeRepulsion: 9000,
-            idealEdgeLength: 70,
-            edgeElasticity: 0.3,
-            gravity: 0.2,
-            nodeSeparation: 60,
-            padding: 24,
-        }).run();
-    } finally {
-        Math.random = random;
-    }
 
     function reset() {
         cy.elements().removeClass('faded focus near');
