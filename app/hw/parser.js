@@ -66,7 +66,8 @@ function parseNpc(line) {
         return null;
     }
 
-    const {team, rest} = cutTeam(type.rest);
+    // The game sometimes puts a space after the type emoji
+    const {team, rest} = cutTeam(type.rest.trimStart());
 
     let name = rest;
     let level = null;
@@ -104,7 +105,7 @@ function parseService(line) {
         rest = raw.slice(unknown[0].length);
     }
 
-    const cut = cutTeam(rest);
+    const cut = cutTeam(rest.trimStart());
     const name = cut.rest.trim();
     if (name === '') {
         return null;
