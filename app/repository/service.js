@@ -1,6 +1,7 @@
 module.exports = function(sequelize, models) {
     return {
         getAllByIds,
+        getOneByKey,
     }
 
     async function getAllByIds(serviceIds) {
@@ -8,6 +9,13 @@ module.exports = function(sequelize, models) {
             where: {
                 id: serviceIds
             }
+        });
+    }
+
+    // Case-insensitive lookup by the key from app/hw/parser.js
+    async function getOneByKey(key) {
+        return await models.services.findOne({
+            where: sequelize.where(sequelize.fn('lower', sequelize.col('name')), sequelize.fn('lower', key))
         });
     }
 }
