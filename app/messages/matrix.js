@@ -1,6 +1,7 @@
 const {findGrid} = require('../util/grid.js');
 
 // /matrix 00 0F: today's links inside the range laid out as a grid, if they form one
+// (possibly with glued sides: a ring or a torus, see app/util/grid.js)
 module.exports = function(app) {
     app.bot.command('/matrix', async (ctx) => {
         await handleMatrix(ctx);
@@ -55,8 +56,7 @@ module.exports = function(app) {
 
         const grid = findGrid(codes, links);
         if (grid.ok) {
-            const rows = grid.rows;
-            ctx.reply(`Сетка ${rows.length}×${rows[0].length} для ${range}:\n` + rows.map((row) => row.join(' ')).join('\n'));
+            ctx.reply(describeGrid(grid, range));
             return;
         }
 
@@ -66,9 +66,29 @@ module.exports = function(app) {
             isolated: `У этих устройств нет известных связей внутри ${range}: ${listed}. Сетку не построить, пока они не исследованы.`,
             degree: `Связи внутри ${range} не образуют сетку: у ${listed} больше четырёх соседей в диапазоне.`,
             disconnected: `Связи внутри ${range} не образуют сетку: диапазон распадается на несвязанные части, отдельно лежат ${listed}.`,
-            shape: `Связи внутри ${range} не раскладываются в прямоугольную сетку.`,
+            shape: `Связи внутри ${range} не раскладываются ни в прямоугольную сетку, ни в кольцо, ни в тор.`,
         };
         ctx.reply(messages[grid.reason]);
+    }
+
+    // Glued sides are told in words with an example, instead of repeating codes past the edge
+    function describeGrid({rows, wrapRows, wrapColumns}, range) {
+        const height = rows.length;
+        const width = rows[0].length;
+        const text = rows.map((row) => row.join(' ')).join('\n');
+        const rightOfLast = `справа от ${rows[0][width - 1]} снова ${rows[0][0]}`;
+        const belowLast = `под ${rows[height - 1][0]} снова ${rows[0][0]}`;
+
+        if (wrapRows && wrapColumns) {
+            return `Тор ${height}×${width} для ${range}: замкнуты и строки, и столбцы.\n${text}\n\nСправа от последнего столбца снова первый, под последней строкой снова первая: ${rightOfLast}, ${belowLast}.`;
+        }
+        if (wrapRows && height === 1) {
+            return `Кольцо из ${width} для ${range}:\n${text}\n\nПосле последнего снова первый: ${rightOfLast}.`;
+        }
+        if (wrapRows) {
+            return `Кольцо ${height}×${width} для ${range}: строки замкнуты.\n${text}\n\nСправа от последнего столбца снова первый: ${rightOfLast}.`;
+        }
+        return `Сетка ${height}×${width} для ${range}:\n${text}`;
     }
 
     // "0F", "F" or the full "AABBCC0F" of the chat's subnet → 15
