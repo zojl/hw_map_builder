@@ -1,3 +1,5 @@
+const parser = require('../hw/parser.js');
+
 module.exports = function (app) {
     app.bot.on(async ctx => {
         let dates = app.getDates();
@@ -71,7 +73,7 @@ module.exports = function (app) {
         }
 
         if (announceMessage !== null) {
-            const reply = await handleAnnounceMessage(announceMessage, dates.day, msg.from_id);
+            const reply = await handleAnnounceMessage(announceMessage, dates.day, msg.from_id, chatPeerId);
             ctx.reply(reply);
             hasHandledMessages = true;
         }
@@ -119,7 +121,10 @@ module.exports = function (app) {
                 }
 
                 if (currentSection === 'services') {
-                    services.push(line.trim());
+                    const service = parser.parseService(line);
+                    if (service !== null) {
+                        services.push(service);
+                    }
                     continue;
                 }
 
@@ -128,8 +133,11 @@ module.exports = function (app) {
                     continue;
                 }
 
-                if (currentSection === 'users' && checkNpcPrefix(line)) {
-                    users.push(line);
+                if (currentSection === 'users') {
+                    const npc = parser.parseNpc(line);
+                    if (npc !== null) {
+                        users.push(npc);
+                    }
                     continue;
                 }
             }
@@ -141,18 +149,21 @@ module.exports = function (app) {
             }
             lastDevice = device;
 
+            const messageDate = new Date(src.date * 1000);
+
             if (users.length > 0) {
-                await app.dbUtil.dbPusher.pushUsers(users, device, src.date * 1000, from, false);
-                await app.service.npcNotifier.notifyChats(chatPeerId, users, device, src.date * 1000);
+                const moves = await app.dbUtil.dbPusher.pushNpcs(users, device, messageDate, from, false, true);
+                await app.service.notifier.notifyMoves(chatPeerId, moves, device, messageDate.getTime());
                 const msgUserPlural = (users.length === 1) ? 'пользователя' : 'пользователей';
-                replies.push(`Координаты ${msgUserPlural} ${users.join(', ')} сохранены`);
+                replies.push(`Координаты ${msgUserPlural} ${users.map((npc) => npc.raw).join(', ')} сохранены`);
             }
 
             if (services.length > 0) {
-                const saved = await app.dbUtil.dbPusher.pushServices(services, device, day, new Date(src.date * 1000), from);
-                if (saved) {
+                const moves = await app.dbUtil.dbPusher.pushServices(services, device, day, messageDate, from, true);
+                if (moves !== null) {
+                    await app.service.notifier.notifyMoves(chatPeerId, moves, device, messageDate.getTime());
                     const msgServicePlural = (services.length === 1) ? 'Сервис' : 'Сервисы';
-                    replies.push(`${msgServicePlural} ${services.join(', ')} на 📟${device} сохранены`);
+                    replies.push(`${msgServicePlural} ${services.map((service) => service.raw).join(', ')} на 📟${device} сохранены`);
                 }
             }
 
@@ -184,12 +195,17 @@ module.exports = function (app) {
         const lines = message.split("\n");
         const userLine = lines[0].split(' ');
         const userName = `🎯${userLine[userLine.length - 2]} ${userLine[userLine.length - 1]}`;
+        const npc = parser.parseNpc(userName);
+        if (npc === null) {
+            return `Не удалось разобрать имя пользователя ${userName}`;
+        }
 
         const deviceLine = lines[lines.length - 1].split('📟');
         const device = deviceLine[deviceLine.length - 1];
 
-        await app.dbUtil.dbPusher.pushUsers([userName], device, hitMessage.date * 1000, vkUserId, true);
-        await app.service.npcNotifier.notifyChats(chatPeerId, [userName], device, hitMessage.date * 1000);
+        const messageDate = new Date(hitMessage.date * 1000);
+        const moves = await app.dbUtil.dbPusher.pushNpcs([npc], device, messageDate, vkUserId, true, true);
+        await app.service.notifier.notifyMoves(chatPeerId, moves, device, messageDate.getTime());
 
         if (
             !silentMode
@@ -201,7 +217,7 @@ module.exports = function (app) {
         return `Координаты пользователя ${userName} сохранены`;
     }
 
-    async function handleAnnounceMessage(announceMessage, day, vkUserId) {
+    async function handleAnnounceMessage(announceMessage, day, vkUserId, chatPeerId) {
         message = announceMessage.text;
         if (
             !message.startsWith('📍Подозрительные пользователи были замечены на устройствах:')
@@ -218,21 +234,23 @@ module.exports = function (app) {
                 continue;
             }
 
-            const npcNamePart = npcLocation[0];
-            if (!checkNpcPrefix(npcNamePart)) {
+            const npc = parser.parseNpc(npcLocation[0]);
+            if (npc === null) {
                 continue;
             }
 
             const deviceCode = npcLocation[1];
 
-            const foundNpc = await app.repository.npc.getOneByName(npcNamePart);
+            // Announces only update NPCs we already know
+            const foundNpc = await app.repository.npc.getOneByKey(npc.key);
             if (foundNpc === null) {
                 continue;
             }
 
-            const npcName = foundNpc.name;
-            await app.dbUtil.dbPusher.pushUsers([npcName], deviceCode, announceMessage.date * 1000, vkUserId, false);
-            addedNpcs.push(foundNpc.name);
+            const messageDate = new Date(announceMessage.date * 1000);
+            const moves = await app.dbUtil.dbPusher.pushNpcs([npc], deviceCode, messageDate, vkUserId, false, true);
+            await app.service.notifier.notifyMoves(chatPeerId, moves, deviceCode, messageDate.getTime());
+            addedNpcs.push(npc.raw);
         }
 
         if (addedNpcs.length === 0) {
@@ -240,23 +258,6 @@ module.exports = function (app) {
         }
 
         return `Координаты пользователей ${addedNpcs.join(', ')} сохранены`;
-    }
-
-    const npcPrefixes = [
-        {prefix: '🔰', npc: 10}, // сисадмин
-        {prefix: '📊', npc: 9},  // информатор
-        {prefix: '🛂', npc: 8},  // инспектор
-        {prefix: '🚸', npc: 7},  // нарушитель
-        {prefix: '🤖', npc: 6},  // ботнет
-        {prefix: '🚨', npc: 5},  // наёмник
-        {prefix: '🎯', npc: 4},  // отслеживаемый
-        {prefix: '⚖', npc: 3},  // торговец
-        {prefix: '⚔', npc: 2},  // босс (старый)
-        {prefix: '👀', npc: 1},  // наблюдатель (на 00)
-    ];
-
-    function checkNpcPrefix(npcName) {
-        return npcPrefixes.some(({prefix}) => npcName.startsWith(prefix));
     }
 
     // Keys are stored without U+FE0F: the game may or may not send the emoji variation selector
@@ -300,19 +301,35 @@ module.exports = function (app) {
             const header = getSectionHeader(line);
             if (header) {
                 currentSection = header;
+                // Service fields are sent only when the message has the section
+                if (header === 'services') {
+                    apiDTO.device_info.services = [];
+                    apiDTO.device_info.broken_services = [];
+                }
                 continue;
             }
 
             if (currentSection === 'users') {
-                for (const {prefix, npc} of npcPrefixes) {
-                    if (line.startsWith(prefix)) {
-                        apiDTO.device_info.npcs.push({
-                            "name": line.substring(prefix.length),
-                            "npc": npc,
-                            "type": "nu"
-                        });
-                        break;
-                    }
+                const npc = parser.parseNpc(line);
+                if (npc !== null) {
+                    apiDTO.device_info.npcs.push({
+                        "name": npc.afterType,
+                        "npc": npc.type,
+                        "type": "nu"
+                    });
+                }
+            }
+
+            if (currentSection === 'services') {
+                const service = parser.parseService(line);
+                if (service !== null) {
+                    apiDTO.device_info.services.push({
+                        "name": service.name,
+                        "service": service.type,
+                        "team": service.team,
+                    });
+                } else {
+                    apiDTO.device_info.broken_services.push(line);
                 }
             }
 

@@ -43,21 +43,88 @@ module.exports = function(sequelize, models) {
     return deviceEntity;
   }
 
-  async function findOrCreateNpc(username) {
-    let npc = await models.npcs.findOne({
+  // NPCs and services are looked up by name case-insensitively (see app/hw/parser.js).
+  // The spelling from the game wins: vhack.info sometimes sends a lowercased name first.
+  async function findOrCreateByName(model, name, fromGame) {
+    const entity = await model.findOne({
+      where: sequelize.where(sequelize.fn('lower', sequelize.col('name')), sequelize.fn('lower', name))
+    });
+
+    if (entity === null) {
+      return await model.create({name: name});
+    }
+
+    if (fromGame && entity.name !== name) {
+      await entity.update({name: name});
+    }
+
+    return entity;
+  }
+
+  async function findSubnetAndDevice(deviceFull) {
+    const subnet = await models.subnets.findOne({
       where: {
-        name: username
+        code: deviceFull.substr(0, 6)
       }
     });
 
-    if (npc !== null) {
-      return npc;
+    if (subnet === null) {
+      return null;
     }
 
-    npcEntity = await models.npcs.create({
-      name: username
-    })
-    return npcEntity;
+    return {subnet, device: await findOrCreateDevice(deviceFull)};
+  }
+
+  // Saves parsed observations. Returns the ones that mean a move: newer than the latest known
+  // observation of that NPC/service and on another device (or the first one ever).
+  // Re-forwarding the same message is skipped.
+  async function pushObservations({entityModel, locationModel, fk, kind, items, place, messageDate, fromGame, fields}) {
+    const moved = [];
+
+    for (const item of items) {
+      const entity = await findOrCreateByName(entityModel, item.name, fromGame);
+
+      const duplicate = await locationModel.findOne({
+        where: {
+          [fk]: entity.id,
+          device: place.device.id,
+          subnet: place.subnet.id,
+          messageDate: messageDate,
+        }
+      });
+      if (duplicate !== null) {
+        continue;
+      }
+
+      const previous = await locationModel.findOne({
+        where: {
+          [fk]: entity.id,
+        },
+        order: [['messageDate', 'DESC']],
+      });
+
+      await locationModel.create({
+        [fk]: entity.id,
+        device: place.device.id,
+        subnet: place.subnet.id,
+        messageDate: messageDate,
+        type: item.type,
+        team: item.team,
+        name: item.name,
+        raw: item.raw,
+        ...fields(item),
+      });
+
+      const isMove = previous === null || (
+        messageDate > previous.messageDate
+        && (previous.device !== place.device.id || previous.subnet !== place.subnet.id)
+      );
+      if (isMove) {
+        moved.push({kind, id: entity.id, raw: item.raw});
+      }
+    }
+
+    return moved;
   }
 
   async function createConnection(source, target, day, subnetId) {
@@ -119,99 +186,51 @@ module.exports = function(sequelize, models) {
     return { copied, skipped };
   }
 
-  const pushUsers = async function(users, deviceFull, messageDate, vkUser, isHit) {
-    const subnetCode = deviceFull.substr(0, 6);
-    const deviceCode = deviceFull.substr(deviceFull.length - 2, 2);
-
-    let subnet = await models.subnets.findOne({
-      where: {
-        code: subnetCode
-      }
-    });
-
-    if(subnet === null) {
-      return false
+  // npcs: parsed with parser.parseNpc. fromGame: the data came from a forwarded game message.
+  // Returns null if the subnet is unknown, otherwise the moves (see pushObservations).
+  const pushNpcs = async function(npcs, deviceFull, messageDate, vkUser, isHit, fromGame) {
+    const place = await findSubnetAndDevice(deviceFull);
+    if (place === null) {
+      return null;
     }
 
-    const device = await findOrCreateDevice(deviceFull);
-
-    for (user of users) {
-      const npc = await findOrCreateNpc(user);
-      let npcLocation = await models.npcLocations.create({
-        npc: npc.id,
-        device: device.id,
-        subnet: subnet.id,
-        messageDate: messageDate,
-        vkUser: vkUser,
-        isHit: isHit,
-      });
-    }
-  }
-
-  async function findOrCreateService(name) {
-    const service = await models.services.findOne({
-      where: {
-        name: name
-      }
-    });
-
-    if (service !== null) {
-      return service;
-    }
-
-    return await models.services.create({
-      name: name
+    return await pushObservations({
+      entityModel: models.npcs,
+      locationModel: models.npcLocations,
+      fk: 'npc',
+      kind: 'npc',
+      items: npcs,
+      place,
+      messageDate,
+      fromGame,
+      fields: (npc) => ({level: npc.level, vkUser, isHit}),
     });
   }
 
-  // Every observation is kept (services move, history matters); re-forwarding the same message is skipped
-  const pushServices = async function(services, deviceFull, day, messageDate, vkUser) {
-    const subnetCode = deviceFull.substr(0, 6);
+  // services: parsed with parser.parseService. Same contract as pushNpcs.
+  const pushServices = async function(services, deviceFull, day, messageDate, vkUser, fromGame) {
+    const place = await findSubnetAndDevice(deviceFull);
+    if (place === null) {
+      return null;
+    }
 
-    const subnet = await models.subnets.findOne({
-      where: {
-        code: subnetCode
-      }
+    return await pushObservations({
+      entityModel: models.services,
+      locationModel: models.serviceLocations,
+      fk: 'service',
+      kind: 'service',
+      items: services,
+      place,
+      messageDate,
+      fromGame,
+      fields: () => ({day, vkUser}),
     });
-
-    if (subnet === null) {
-      return false;
-    }
-
-    const device = await findOrCreateDevice(deviceFull);
-
-    for (const name of services) {
-      const service = await findOrCreateService(name);
-      const existing = await models.serviceLocations.findOne({
-        where: {
-          service: service.id,
-          device: device.id,
-          subnet: subnet.id,
-          messageDate: messageDate,
-        }
-      });
-
-      if (existing !== null) {
-        continue;
-      }
-
-      await models.serviceLocations.create({
-        service: service.id,
-        device: device.id,
-        subnet: subnet.id,
-        day: day,
-        messageDate: messageDate,
-        vkUser: vkUser,
-      });
-    }
-
-    return true;
   }
 
   return {
     pushConnections: pushToDB,
     copyConnections,
-    pushUsers,
+    pushNpcs,
     pushServices,
   };
 };

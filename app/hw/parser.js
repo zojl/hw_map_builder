@@ -57,7 +57,8 @@ function cutTeam(str) {
 }
 
 // NPC: the type must be known (the users section also lists real players).
-// Returns {type, team, name, level, key, raw} or null.
+// Returns {type, team, name, level, key, raw, afterType} or null;
+// afterType is the line without the type emoji, the format vhack.info gets NPC names in.
 function parseNpc(line) {
     const raw = line.trim();
     const type = matchPrefix(raw, npcTypes);
@@ -80,7 +81,7 @@ function parseNpc(line) {
         return null;
     }
 
-    return {type: type.entry.id, team, name, level, key: toKey(name), raw};
+    return {type: type.entry.id, team, name, level, key: toKey(name), raw, afterType: type.rest.trim()};
 }
 
 // Service: any leading emoji is the type (0 when unknown), the section holds only services.

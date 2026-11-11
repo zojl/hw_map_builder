@@ -65,7 +65,7 @@ app.dbUtil.countedLinks = require('./app/dbUtil/countedLinks.js')(app);
 app.service = {};
 app.service.vHackApi = require('./app/service/vHackApi.js')(app);
 app.service.statBotImporter = require('./app/service/statBotImporter.js')(app);
-app.service.npcNotifier = require('./app/service/npcNotifier.js')(app);
+app.service.notifier = require('./app/service/notifier.js')(app);
 
 app.getDates = require('./app/util/dates.js');
 
