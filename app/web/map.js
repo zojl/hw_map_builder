@@ -1,9 +1,30 @@
-const crypto = require('crypto');
+const path = require('path');
 
-// GET /map/<token>: a static snapshot of the chat's subnet for the current game day.
+// GET /map/<token>: a snapshot of the chat's subnet for the current game day, drawn as a graph
+// by app/web/public/map-page.js (Cytoscape.js + fcose layout, served from node_modules by us).
 // Access: the token (app/service/mapLink.js) names the chat; subnet and day are resolved here,
 // at opening time, never taken from the URL. Only devices and links are shown for now.
 module.exports = function(app) {
+    const assets = {
+        'cytoscape.min.js': require.resolve('cytoscape/dist/cytoscape.min.js'),
+        'layout-base.js': require.resolve('layout-base/layout-base.js'),
+        'cose-base.js': require.resolve('cose-base/cose-base.js'),
+        'cytoscape-fcose.js': require.resolve('cytoscape-fcose/cytoscape-fcose.js'),
+        'map-page.js': path.join(__dirname, 'public', 'map-page.js'),
+    };
+
+    // Scripts only, no data: safe to cache and to serve without a token
+    app.http.get('/map-assets/:name', (req, res) => {
+        const file = assets[req.params.name];
+        if (typeof(file) === 'undefined') {
+            res.status(404).end();
+            return;
+        }
+
+        res.set({'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff'});
+        res.type('application/javascript').sendFile(file);
+    });
+
     app.http.get('/map/:token', async (req, res) => {
         try {
             await handleMap(req, res);
@@ -39,14 +60,14 @@ module.exports = function(app) {
             .filter((connection) => codes[connection.source] && codes[connection.target])
             .map((connection) => ({source: codes[connection.source], target: codes[connection.target]}));
 
-        send(res, 200, renderMap({subnetCode: subnet.code, links, generatedAt: new Date()}));
+        send(res, 200, renderMap({subnetCode: subnet.code, day, links, generatedAt: new Date()}));
     }
 
     function sendMessage(res, status, message) {
-        send(res, status, renderPage('Карта подсети', `<main class="message"><p>${escape(message)}</p></main>`, ''));
+        send(res, status, renderPage('Карта подсети', `<main class="message"><p>${escape(message)}</p></main>`));
     }
 
-    function send(res, status, {html, nonce}) {
+    function send(res, status, html) {
         res.status(status);
         res.set({
             'Content-Type': 'text/html; charset=utf-8',
@@ -55,174 +76,73 @@ module.exports = function(app) {
             'Referrer-Policy': 'no-referrer',
             'X-Robots-Tag': 'noindex, nofollow',
             'X-Content-Type-Options': 'nosniff',
-            'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+            'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
         });
         res.send(html);
     }
 };
 
-const cell = 40;
-const radius = 13;
-const margin = 26;
-const size = margin + 16 * cell + 6;
-
-// Devices sit on a 16×16 grid by their code: A7 is row A, column 7. Positions are the same every day.
-function position(code) {
-    const value = parseInt(code, 16);
-    return {
-        x: margin + (value % 16) * cell + cell / 2,
-        y: margin + Math.floor(value / 16) * cell + cell / 2,
-    };
-}
-
-function renderMap({subnetCode, links, generatedAt}) {
+// Graph for the page: devices seen today and links between them.
+// A→B and B→A become one mutual edge: a link known from one side only keeps its arrow.
+function buildGraph(links) {
     const sources = new Set(links.map((link) => link.source));
-    const targets = new Set(links.map((link) => link.target));
+    const devices = new Set(links.flatMap((link) => [link.source, link.target]));
+    const directed = new Set(links.filter((link) => link.source !== link.target).map((link) => link.source + '>' + link.target));
 
-    const headers = [];
-    for (let i = 0; i < 16; i++) {
-        const digit = i.toString(16).toUpperCase();
-        const center = margin + i * cell + cell / 2;
-        headers.push(`<text class="axis" x="${center}" y="${margin - 9}">${digit}</text>`);
-        headers.push(`<text class="axis" x="${margin - 12}" y="${center + 4}">${digit}</text>`);
-    }
-
+    const nodes = [...devices].sort().map((code) => ({id: code, state: sources.has(code) ? 'explored' : 'seen'}));
     const edges = [];
-    const seen = new Set();
-    for (const {source, target} of links) {
-        const key = source + '>' + target;
-        if (source === target || seen.has(key)) {
+    for (const key of [...directed].sort()) {
+        const [source, target] = key.split('>');
+        const mutual = directed.has(target + '>' + source);
+        if (mutual && source > target) {
             continue;
         }
-        seen.add(key);
-        edges.push(`<path class="edge" data-s="${escape(source)}" data-t="${escape(target)}" d="${edgePath(position(source), position(target))}"/>`);
+        edges.push({source, target, mutual});
     }
 
-    const nodes = [];
-    let explored = 0;
-    let found = 0;
-    for (let value = 0; value < 256; value++) {
-        const code = value.toString(16).toUpperCase().padStart(2, '0');
-        const {x, y} = position(code);
-        let state = 'unknown';
-        let title = 'нет данных';
-        if (sources.has(code)) {
-            state = 'explored';
-            title = 'исследовано';
-            explored++;
-        } else if (targets.has(code)) {
-            state = 'seen';
-            title = 'видели только как связь';
-            found++;
-        }
+    return {nodes, edges};
+}
 
-        nodes.push(`<g class="node ${state}" data-code="${code}"><title>${code}: ${title}</title>`
-            + `<circle cx="${x}" cy="${y}" r="${radius}"/>`
-            + `<text x="${x}" y="${y + 3.5}">${code}</text></g>`);
-    }
-
+function renderMap({subnetCode, day, links, generatedAt}) {
+    const graph = buildGraph(links);
+    const explored = graph.nodes.filter((node) => node.state === 'explored').length;
     const time = generatedAt.toLocaleString('ru-RU', {day: 'numeric', month: 'numeric', hour: 'numeric', minute: 'numeric'});
-    const markers = ['def', 'out', 'in'].map((kind) =>
-        `<marker id="arrow-${kind}" class="arrow-${kind}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>`
-    ).join('');
+    // Same seed for the same subnet and day: reopening the map keeps the picture familiar
+    const data = {seed: `${subnetCode}:${day}`, ...graph};
 
     const body = `
 <header>
-  <h1>Подсеть ${escape(subnetCode)}</h1>
-  <p class="meta">Снимок на ${escape(time)} · исследовано ${explored} · видели ${found} · связей ${edges.length}</p>
+  <div class="title">
+    <h1>Подсеть ${escape(subnetCode)}</h1>
+    <p class="meta">Снимок на ${escape(time)} · исследовано ${explored} из ${graph.nodes.length} · связей ${graph.edges.length}</p>
+  </div>
+  <form id="search" class="search" autocomplete="off">
+    <input id="search-code" type="text" inputmode="text" maxlength="8" placeholder="Код, например A7" aria-label="Найти устройство">
+    <button type="submit">Найти</button>
+    <button type="button" id="fit">Весь граф</button>
+  </form>
   <ul class="legend">
     <li><span class="dot explored"></span>исследовано</li>
     <li><span class="dot seen"></span>видели только как связь</li>
-    <li><span class="dot unknown"></span>нет данных</li>
+    <li><span class="line"></span>связь в обе стороны</li>
+    <li><span class="line oneway"></span>известна с одной стороны</li>
   </ul>
+  <p id="info" class="info">Нажми на устройство, чтобы выделить его соседей.</p>
 </header>
-<main>
-  <p id="info" class="info">Нажми на устройство, чтобы выделить его связи.</p>
-  <svg id="map" viewBox="0 0 ${size} ${size}" role="img" aria-label="Карта устройств подсети ${escape(subnetCode)}">
-    <defs>${markers}</defs>
-    <g class="axes">${headers.join('')}</g>
-    <g class="edges">${edges.join('')}</g>
-    <g class="nodes">${nodes.join('')}</g>
-  </svg>
-</main>`;
+<main id="graph" aria-label="Граф устройств подсети ${escape(subnetCode)}"></main>
+${graph.nodes.length === 0 ? '<p class="empty">За этот игровой день связей ещё нет.</p>' : ''}
+<script type="application/json" id="graph-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
+<script src="/map-assets/cytoscape.min.js"></script>
+<script src="/map-assets/layout-base.js"></script>
+<script src="/map-assets/cose-base.js"></script>
+<script src="/map-assets/cytoscape-fcose.js"></script>
+<script src="/map-assets/map-page.js"></script>`;
 
-    return renderPage(`Подсеть ${subnetCode}`, body, script);
+    return renderPage(`Подсеть ${subnetCode}`, body);
 }
 
-// A slight curve, so that A→B and B→A don't overlap and lines bend around nodes in between
-function edgePath(from, to) {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const length = Math.hypot(dx, dy);
-    const bend = 0.15 * length;
-    const control = {x: (from.x + to.x) / 2 - dy / length * bend, y: (from.y + to.y) / 2 + dx / length * bend};
-
-    const start = moveTowards(from, control, radius);
-    const end = moveTowards(to, control, radius + 1);
-    return `M${round(start.x)},${round(start.y)} Q${round(control.x)},${round(control.y)} ${round(end.x)},${round(end.y)}`;
-}
-
-function moveTowards(point, towards, distance) {
-    const dx = towards.x - point.x;
-    const dy = towards.y - point.y;
-    const length = Math.hypot(dx, dy) || 1;
-    return {x: point.x + dx / length * distance, y: point.y + dy / length * distance};
-}
-
-function round(value) {
-    return Math.round(value * 10) / 10;
-}
-
-// Click a device to highlight its links; click it again or the background to reset
-const script = `
-const svg = document.getElementById('map');
-const info = document.getElementById('info');
-const defaultInfo = info.textContent;
-let selected = null;
-
-function reset() {
-  selected = null;
-  svg.classList.remove('focus');
-  svg.querySelectorAll('.out, .in, .near, .sel').forEach((el) => el.classList.remove('out', 'in', 'near', 'sel'));
-  info.textContent = defaultInfo;
-}
-
-svg.addEventListener('click', (event) => {
-  const node = event.target.closest('.node');
-  const code = node ? node.dataset.code : null;
-  if (code === null || code === selected) {
-    reset();
-    return;
-  }
-
-  reset();
-  selected = code;
-  svg.classList.add('focus');
-  node.classList.add('sel');
-  const outgoing = [];
-  const incoming = [];
-  svg.querySelectorAll('.edge').forEach((edge) => {
-    if (edge.dataset.s === code) {
-      edge.classList.add('out');
-      outgoing.push(edge.dataset.t);
-    } else if (edge.dataset.t === code) {
-      edge.classList.add('in');
-      incoming.push(edge.dataset.s);
-    }
-  });
-  [...outgoing, ...incoming].forEach((other) => {
-    const el = svg.querySelector('.node[data-code="' + other + '"]');
-    if (el) el.classList.add('near');
-  });
-
-  const list = (codes) => codes.length > 0 ? codes.sort().join(', ') : 'нет';
-  info.textContent = '📟' + code + ' → ' + list(outgoing) + ' · ← ' + list(incoming);
-});
-`;
-
-function renderPage(title, body, pageScript) {
-    const nonce = crypto.randomBytes(16).toString('base64');
-    const html = `<!doctype html>
+function renderPage(title, body) {
+    return `<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
@@ -231,64 +151,52 @@ function renderPage(title, body, pageScript) {
 <title>${escape(title)}</title>
 <style>
 :root {
-  --bg: #f6f6f3; --fg: #1d1d1f; --muted: #6b6b70; --axis: #9a9a9f;
-  --edge: rgba(55, 55, 70, 0.26); --out: #1f6feb; --in: #d4520c;
-  --explored: #2f7d4f; --seen: #b7801a; --unknown: #cfcfca; --label: #ffffff;
+  --bg: #f6f6f3; --surface: #ffffff; --fg: #1d1d1f; --muted: #6b6b70; --border: #dcdcd6;
+  --edge: #a9a9b2; --accent: #1f6feb;
+  --explored: #2f7d4f; --seen: #b7801a; --label: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #141416; --fg: #ececec; --muted: #9a9aa0; --axis: #6a6a70;
-    --edge: rgba(220, 220, 235, 0.2); --out: #5aa2ff; --in: #ff9a4d;
-    --explored: #45a96f; --seen: #d8a23a; --unknown: #3a3a3f; --label: #141416;
+    --bg: #141416; --surface: #1d1d20; --fg: #ececec; --muted: #9a9aa0; --border: #34343a;
+    --edge: #5c5c66; --accent: #5aa2ff;
+    --explored: #45a96f; --seen: #d8a23a; --label: #141416;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #141416; --fg: #ececec; --muted: #9a9aa0; --axis: #6a6a70;
-  --edge: rgba(220, 220, 235, 0.2); --out: #5aa2ff; --in: #ff9a4d;
-  --explored: #45a96f; --seen: #d8a23a; --unknown: #3a3a3f; --label: #141416;
+  --bg: #141416; --surface: #1d1d20; --fg: #ececec; --muted: #9a9aa0; --border: #34343a;
+  --edge: #5c5c66; --accent: #5aa2ff;
+  --explored: #45a96f; --seen: #d8a23a; --label: #141416;
 }
 * { box-sizing: border-box; }
-body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header, main { max-width: 760px; margin: 0 auto; }
-h1 { margin: 0 0 4px; font-size: 22px; }
-.meta, .info { margin: 0 0 8px; color: var(--muted); }
-.info { min-height: 1.4em; font-variant-numeric: tabular-nums; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 12px; padding: 0; list-style: none; color: var(--muted); font-size: 14px; }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 12px 16px 8px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: flex-end; }
+.title { flex: 1 1 260px; }
+h1 { margin: 0; font-size: 20px; }
+.meta { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.search { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 1 auto; min-width: 0; }
+.search input, .search button { font: inherit; font-size: 14px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--fg); }
+.search input { width: 140px; min-width: 0; flex: 1 1 100px; text-transform: uppercase; }
+.search input::placeholder { text-transform: none; }
+.search button { cursor: pointer; }
+.search input.miss { border-color: #d4520c; }
+.legend { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: 13px; }
 .legend li { display: flex; align-items: center; gap: 6px; }
-.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot { width: 11px; height: 11px; border-radius: 50%; }
 .dot.explored { background: var(--explored); }
 .dot.seen { background: var(--seen); }
-.dot.unknown { border: 1.5px solid var(--unknown); }
-.message { padding-top: 20vh; text-align: center; font-size: 17px; }
-svg { display: block; width: 100%; height: auto; user-select: none; }
-.axis { fill: var(--axis); font: 11px ui-monospace, monospace; text-anchor: middle; }
-.edge { fill: none; stroke: var(--edge); stroke-width: 1.2; marker-end: url(#arrow-def); }
-.arrow-def path { fill: var(--edge); }
-.arrow-out path { fill: var(--out); }
-.arrow-in path { fill: var(--in); }
-.node { cursor: pointer; }
-.node circle { stroke-width: 1.5; }
-.node text { font: 600 10px ui-monospace, monospace; text-anchor: middle; pointer-events: none; }
-.node.explored circle { fill: var(--explored); stroke: var(--explored); }
-.node.seen circle { fill: var(--seen); stroke: var(--seen); }
-.node.explored text, .node.seen text { fill: var(--label); }
-.node.unknown circle { fill: var(--bg); stroke: var(--unknown); }
-.node.unknown text { fill: var(--axis); font-weight: 400; }
-svg.focus .edge { opacity: 0.08; }
-svg.focus .edge.out { opacity: 1; stroke: var(--out); stroke-width: 2; marker-end: url(#arrow-out); }
-svg.focus .edge.in { opacity: 1; stroke: var(--in); stroke-width: 2; marker-end: url(#arrow-in); }
-svg.focus .node { opacity: 0.3; }
-svg.focus .node.sel, svg.focus .node.near { opacity: 1; }
-svg.focus .node.sel circle { stroke: var(--fg); stroke-width: 2.5; }
+.line { width: 22px; border-top: 2px solid var(--edge); }
+.line.oneway { border-top-style: dashed; }
+.info { flex-basis: 100%; margin: 0; min-height: 1.4em; font-size: 14px; font-variant-numeric: tabular-nums; }
+#graph { flex: 1; min-height: 0; width: 100%; overflow: hidden; }
+.empty { position: absolute; top: 50%; left: 0; right: 0; text-align: center; color: var(--muted); }
+.message { margin: auto; padding: 16px; text-align: center; font-size: 17px; }
 </style>
 </head>
 <body>
 ${body}
-${pageScript ? `<script nonce="${nonce}">${pageScript}</script>` : ''}
 </body>
 </html>`;
-
-    return {html, nonce};
 }
 
 function escape(value) {
@@ -296,3 +204,4 @@ function escape(value) {
 }
 
 module.exports.renderMap = renderMap;
+module.exports.buildGraph = buildGraph;
