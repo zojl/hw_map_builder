@@ -66,6 +66,7 @@ app.service = {};
 app.service.vHackApi = require('./app/service/vHackApi.js')(app);
 app.service.statBotImporter = require('./app/service/statBotImporter.js')(app);
 app.service.notifier = require('./app/service/notifier.js')(app);
+app.service.mapLink = require('./app/service/mapLink.js');
 
 app.getDates = require('./app/util/dates.js');
 
@@ -113,6 +114,7 @@ require('./app/messages/npc.js')(app);
 require('./app/messages/history.js')(app);
 require('./app/messages/service.js')(app);
 require('./app/messages/subscribe.js')(app);
+require('./app/messages/map.js')(app);
 
 require('./app/messages/chat.js')(app);
 
@@ -132,6 +134,7 @@ app.bot.use(async (ctx, next) => {
 
 app.http.use(bodyParser.json());
 app.http.post('/', app.bot.webhookCallback);
+require('./app/web/map.js')(app);
 app.http.listen(process.env.PORT);
 console.info('bot started as callback at ' + process.env.PORT);
 

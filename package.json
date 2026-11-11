@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "copylinks": "node scripts/copylinks.js",
-    "migrate-names": "node scripts/migrate-names.js"
+    "migrate-names": "node scripts/migrate-names.js",
+    "map-link-owner": "node scripts/map-link-owner.js"
   },
   "author": "",
   "license": "ISC",
