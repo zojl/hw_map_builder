@@ -1,5 +1,7 @@
 const parser = require('../hw/parser.js');
 
+const ADDRESS_LENGTH = 8;
+
 // Receives devices that vhack.info forwards to us
 module.exports = function(app) {
     const express = require('express');
@@ -49,6 +51,7 @@ module.exports = function(app) {
     async function saveDevice(body, day) {
         const sourceDevice = toDeviceCode(body.device.device);
         // VI moved devices from a list of addresses to a map keyed by address; accept both
+        // TODO: drop the old list format once VI sends only the map
         const linked = body.device.devices || [];
         const targetDevices = (Array.isArray(linked) ? linked : Object.keys(linked)).map(toDeviceCode);
         const messageDate = new Date(body.timestamp * 1000);
@@ -92,12 +95,14 @@ module.exports = function(app) {
         }
     }
 
-    // Devices come as numbers; keep leading zeros so the subnet code stays 6 chars
-    // (object keys are always strings, so a decimal key is turned back into a number first)
-    function toDeviceCode(number) {
-        if (typeof number === 'string' && /^\d+$/.test(number)) {
-            number = Number(number);
+    // An address is always 8 hex chars. Devices may come as numbers or as strings (map keys);
+    // a string longer than an address made only of digits is a decimal number.
+    // Keep leading zeros so the subnet code stays 6 chars.
+    function toDeviceCode(device) {
+        if (typeof device === 'string' && device.length > ADDRESS_LENGTH && /^\d+$/.test(device)) {
+            device = Number(device);
         }
-        return number.toString(16).toUpperCase().padStart(8, '0');
+        const hex = typeof device === 'number' ? device.toString(16) : device;
+        return hex.toUpperCase().padStart(ADDRESS_LENGTH, '0');
     }
 }
