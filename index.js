@@ -23,9 +23,18 @@ process.on('unhandledRejection', (reason) => {
 let app = {};
 app.sentry = Sentry;
 app.http = express();
+// How VK delivers updates: 'callback' (VK POSTs them to our HTTP port) or 'longpoll'
+// (we poll VK ourselves, no public address needed). Default keeps the old behaviour.
+const BOT_MODE = (process.env.BOT_MODE || 'callback').toLowerCase();
+if (!['callback', 'longpoll'].includes(BOT_MODE)) {
+  throw new Error(`Unknown BOT_MODE "${process.env.BOT_MODE}", expected callback or longpoll`);
+}
+
 app.bot = new VkBot({
   token: process.env.TOKEN,
-  confirmation: process.env.CONFIRMATION
+  confirmation: process.env.CONFIRMATION,
+  // Only needed for longpoll; without it the library asks VK for the token's group.
+  group_id: process.env.GROUP_ID || undefined,
 });
 app.db = new Sequelize(process.env.DB, {logging: process.env.ENV.toLowerCase() === 'dev'});
 
@@ -134,10 +143,34 @@ app.bot.use(async (ctx, next) => {
 });
 
 app.http.use(bodyParser.json());
-app.http.post('/', app.bot.webhookCallback);
+if (BOT_MODE === 'callback') {
+  app.http.post('/', app.bot.webhookCallback);
+}
+// The HTTP port is still needed in longpoll mode: it serves the /map pages.
 require('./app/web/map.js')(app);
 app.http.listen(process.env.PORT);
-console.info('bot started as callback at ' + process.env.PORT);
+
+if (BOT_MODE === 'longpoll') {
+  // node-vk-bot-api retries a failed poll immediately and forever, so a bad token or a
+  // network outage would spin in a tight loop. On error, pause polling and resume later.
+  const POLL_RETRY_MS = 5000;
+  const onPoll = (err) => {
+    if (!err) {
+      console.info('bot started with longpoll, http at ' + process.env.PORT);
+      return;
+    }
+    console.error('Long poll error, retrying in ' + POLL_RETRY_MS / 1000 + 's:', err.message || err);
+    Sentry.captureException(err);
+    app.bot.stop();
+    setTimeout(() => {
+      app.bot.isStopped = false;
+      app.bot.startPolling(onPoll);
+    }, POLL_RETRY_MS);
+  };
+  app.bot.startPolling(onPoll);
+} else {
+  console.info('bot started as callback at ' + process.env.PORT);
+}
 
 
 if (process.env.INCOMING_DEVICES_PORT != '') {
