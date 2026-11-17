@@ -1,6 +1,19 @@
 module.exports = function(sequelize, models) {
     return {
-        getOneByPeerId
+        getOneByPeerId,
+        getAllByIds,
+    }
+
+    async function getAllByIds(ids) {
+        if (ids.length === 0) {
+            return [];
+        }
+
+        return await models.chats.findAll({
+            where: {
+                id: ids
+            }
+        });
     }
 
     async function getOneByPeerId(peerId) {

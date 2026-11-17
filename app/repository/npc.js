@@ -2,8 +2,7 @@ module.exports = function(sequelize, models) {
     return {
         getOneById,
         getAllByIds,
-        getOneByName,
-        getAllByNamePart,
+        getOneByKey,
     }
 
     async function getOneById(npcId) {
@@ -24,25 +23,10 @@ module.exports = function(sequelize, models) {
         });
     }
 
-    async function getOneByName(npcName) {
-        let npc = await models.npcs.findOne({
-            where: {
-                name: npcName
-            }
+    // Case-insensitive lookup by the key from app/hw/parser.js
+    async function getOneByKey(key) {
+        return await models.npcs.findOne({
+            where: sequelize.where(sequelize.fn('lower', sequelize.col('name')), sequelize.fn('lower', key))
         });
-
-        return npc;
-    }
-
-    async function getAllByNamePart(npcNamePart) {
-        let npcs = await models.npcs.findAll({
-            where: {
-                name: {
-                    [sequelize.Op.like]: npcNamePart
-                }
-            }
-        });
-
-        return npcs;
     }
 }

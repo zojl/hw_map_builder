@@ -51,7 +51,9 @@ module.exports = function(app) {
                 : npcLocation.messageDate.toLocaleTimeString('ru-RU', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
             ;
             
-            responseParts[npc.name] = `${npc.name}: 📟${device.code} (${time})`;
+            // The latest observation as the game showed it (type, team, level may change)
+            const displayName = npcLocation.raw || npc.name;
+            responseParts[npc.name] = `${displayName}: 📟${device.code} (${time})`;
             
             if (sourceDevice !== null) {
                 const route = await app.dbUtil.pgroute.getRoute(sourceDevice.code, device.code, dates.day, subnet.id)

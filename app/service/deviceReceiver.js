@@ -1,15 +1,18 @@
+const parser = require('../hw/parser.js');
+
+// Receives devices that vhack.info forwards to us
 module.exports = function(app) {
     const express = require('express');
     const bodyParser = require('body-parser');
-    
-    inhttp = express();
+
+    const inhttp = express();
     inhttp.use(bodyParser.json());
     inhttp.use(bodyParser.urlencoded({ extended: false }))
     inhttp.listen(process.env.INCOMING_DEVICES_PORT);
     inhttp.post('/', handleReceivedDevice)
     console.log('listening to incoming devices started at ' + process.env.INCOMING_DEVICES_PORT)
 
-    function handleReceivedDevice(req, res) {
+    async function handleReceivedDevice(req, res) {
         if (process.env.IS_INCOMING_DUMP === 'true') {
             console.log(req);
         }
@@ -21,81 +24,74 @@ module.exports = function(app) {
         }
 
         let dates = app.getDates();
-        
+
         const now = new Date();
         const updateTime = new Date(now.getFullYear(), now.getMonth(), dates.dayOfMonth, 18);
         const updateTimeStamp = updateTime.getTime() / 1000;
-        
+
         if (updateTimeStamp > req.body.timestamp) {
             res.status(400).json({ message: "Requested data is too old" });
             return;
         }
 
-        const sourceDevice = req.body.device.device.toString(16).toUpperCase();
-        let targetDevices = [];
-        
-        for (const dec of req.body.device.devices) {
-            targetDevices.push(dec.toString(16).toUpperCase());
-        };
-
-        console.log('Received from VI (ident ' + req.body.ident  + '): ' + sourceDevice + ' linked to ' + targetDevices.join(', '));
-        const result = app.dbUtil.dbPusher.pushConnections(sourceDevice, targetDevices, dates.day);
-        
-        if (req.body.device.npcs.length > 0) {
-            let users = [];
-            for (const npc of req.body.device.npcs) {
-                const prefix = getNpcPrefixByTypeId(npc.npc)
-                if (prefix === null) {
-                    continue;
-                }
-                
-                const npcName = npc.displayed_name ? npc.displayed_name: npc.name;
-                users.push(prefix + npcName);
-            }
-            
-            // const ident = JSON.parse(req.body.ident);
-            app.dbUtil.dbPusher.pushUsers(
-                users,
-                sourceDevice,
-                req.body.timestamp * 1000,
-                0, // ident.from_id,
-                false
-            );
-            console.log(`Received from VI (ident ${req.body.ident}) users ${users.join(',')} at ${sourceDevice}`)
-            app.service.npcNotifier.notifyChats(null, users, sourceDevice, req.body.timestamp * 1000);
+        try {
+            await saveDevice(req.body, dates.day);
+        } catch (error) {
+            console.error('Failed to save device from VI:', error);
+            app.sentry.captureException(error);
+            res.status(500).json({ message: "Failed to save the device" });
+            return;
         }
+
         res.json({"status": "OK"});
     }
 
-    function getNpcPrefixByTypeId(type) {
-        if (type === 7) {
-            return '🚸'
+    async function saveDevice(body, day) {
+        const sourceDevice = toDeviceCode(body.device.device);
+        const targetDevices = body.device.devices.map(toDeviceCode);
+        const messageDate = new Date(body.timestamp * 1000);
+
+        console.log('Received from VI (ident ' + body.ident  + '): ' + sourceDevice + ' linked to ' + targetDevices.join(', '));
+        await app.dbUtil.dbPusher.pushConnections(sourceDevice, targetDevices, day);
+
+        const npcs = [];
+        for (const npc of body.device.npcs || []) {
+            // VI sends the name without the type emoji, as we send it to them
+            const parsed = parser.parseNpc(parser.npcTypeEmoji(npc.npc) + (npc.displayed_name ? npc.displayed_name : npc.name));
+            if (parsed !== null) {
+                npcs.push(parsed);
+            }
         }
 
-        if (type === 6) {
-            return '🤖'
+        if (npcs.length > 0) {
+            const moves = await app.dbUtil.dbPusher.pushNpcs(npcs, sourceDevice, messageDate, 0, false, false);
+            console.log(`Received from VI (ident ${body.ident}) users ${npcs.map((npc) => npc.raw).join(',')} at ${sourceDevice}`);
+            await app.service.notifier.notifyMoves(null, moves, sourceDevice, messageDate.getTime());
         }
 
-        if (type === 5) {
-            return '🚨'
+        const services = [];
+        for (const service of body.device.services || []) {
+            if (typeof(service.name) !== 'string' || service.name.trim() === '') {
+                continue;
+            }
+
+            const item = {
+                type: Number.isInteger(service.service) ? service.service : 0,
+                team: Number.isInteger(service.team) ? service.team : -1,
+                name: service.name.trim(),
+            };
+            services.push({...item, key: parser.toKey(item.name), raw: parser.formatService(item)});
         }
 
-        if (type === 4) {
-            return '🎯'
+        if (services.length > 0) {
+            const moves = await app.dbUtil.dbPusher.pushServices(services, sourceDevice, day, messageDate, 0, false);
+            console.log(`Received from VI (ident ${body.ident}) services ${services.map((service) => service.raw).join(',')} at ${sourceDevice}`);
+            await app.service.notifier.notifyMoves(null, moves, sourceDevice, messageDate.getTime());
         }
+    }
 
-        if (type === 3) {
-            return '⚖'
-        }
-        
-        if (type === 2) {
-            return '⚔';
-        }
-        
-        if (type === 1) {
-            return '👀';
-        }
-        
-        return null;
+    // Devices come as numbers; keep leading zeros so the subnet code stays 6 chars
+    function toDeviceCode(number) {
+        return number.toString(16).toUpperCase().padStart(8, '0');
     }
 }
