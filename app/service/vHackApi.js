@@ -1,6 +1,11 @@
 module.exports =
     (app) => {
-        const https = require('https');
+        // got is ESM-only; Node 22+ can require() it, the client is its default export
+        const got = require('got').default;
+
+        // Fail fast instead of hanging on a slow VI: 100ms to connect (TCP and TLS each),
+        // then 300ms to get the response
+        const TIMEOUT = { connect: 100, secureConnect: 100, response: 300 };
 
         return {
             getDeviceDTO,
@@ -87,14 +92,15 @@ module.exports =
                 console.log(dto);
             }
             
-            send(dto, '/api/network/device');
+            return send(dto, '/api/network/device');
         }
 
         function sendNpc(dto) {
-            send(dto, '/api/network/npc')
+            return send(dto, '/api/network/npc');
         }
 
-        function send(data, path) {
+        // Never rejects: callers don't await it, errors are logged here
+        async function send(data, path) {
             const url = process.env.VHINFO_HOST + path;
             data.token = process.env.VHINFO_TOKEN;
             data.ident = 'chinamap / ' + data.ident;
@@ -104,49 +110,43 @@ module.exports =
             if (process.env.ENV === 'dev') {
                 console.debug(requestData);
             }
-            const options = {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(requestData),
-                    'User-Agent': 'c0nd0rs_map_builder/1.0'
-                }
+            try {
+                const response = await got.post(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'c0nd0rs_map_builder/1.0'
+                    },
+                    body: requestData,
+                    timeout: TIMEOUT,
+                    retry: { limit: 0 },
+                    throwHttpErrors: false, // non-200 answers are reported by handleResponse
+                });
+                handleResponse(response.statusCode, response.body, requestData);
+            } catch (e) {
+                app.sentry.captureException(e);
+                console.error('vhack.info api problem (' + path + '): ' + e.message);
+            }
+        }
+
+        function handleResponse(statusCode, responseText, requestData) {
+            if (statusCode !== 200) {
+                app.sentry.captureMessage(responseText);
+                console.error(responseText);
+                return;
             }
 
-            const request = https.request(url, options, (response) => {
-                if (response.statusCode !== 200) {
-                    response.on('data', (body) => {
-                        app.sentry.captureMessage(body.toString());
-                        console.error(body.toString());
+            try {
+                const responseBody = JSON.parse(responseText);
+                if (!responseBody.success) {
+                    app.sentry.captureMessage({
+                        "request": requestData,
+                        "response": responseText
                     });
                 }
-            });
-
-            let rawBody = '';
-            request.on('data', (chunk) => {
-                rawBody += chunk;
-            });
-            request.on('end', async () => {
-                const responseText = rawBody.toString();
-                try {
-                    const responseBody = JSON.parse(responseText)
-                    if (!responseBody.success) {
-                        app.sentry.captureMessage({
-                            "request": requestData,
-                            "response": responseText
-                        });
-                    }
-                } catch (e) {
-                    e.requestBody = requestData;
-                    e.response = responseText;
-                    app.sentry.captureException(e);
-                }
-            })
-            request.on('error', (e) => {
+            } catch (e) {
+                e.requestBody = requestData;
+                e.response = responseText;
                 app.sentry.captureException(e);
-                console.error('statBot api problem: ' + e.message);
-            });
-            request.write(requestData);
-            request.end();
+            }
         }
     }
