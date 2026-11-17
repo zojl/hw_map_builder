@@ -334,7 +334,7 @@ module.exports = function (app) {
             }
 
             if (currentSection === 'connections' && line.startsWith('📟')) {
-                apiDTO.device_info.devices.push(line.match(/[A-F0-9]{8}/)[0]);
+                apiDTO.device_info.devices[line.match(/[A-F0-9]{8}/)[0]] = {};
             }
         }
 

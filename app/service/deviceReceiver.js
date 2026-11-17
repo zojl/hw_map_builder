@@ -48,7 +48,9 @@ module.exports = function(app) {
 
     async function saveDevice(body, day) {
         const sourceDevice = toDeviceCode(body.device.device);
-        const targetDevices = body.device.devices.map(toDeviceCode);
+        // VI moved devices from a list of addresses to a map keyed by address; accept both
+        const linked = body.device.devices || [];
+        const targetDevices = (Array.isArray(linked) ? linked : Object.keys(linked)).map(toDeviceCode);
         const messageDate = new Date(body.timestamp * 1000);
 
         console.log('Received from VI (ident ' + body.ident  + '): ' + sourceDevice + ' linked to ' + targetDevices.join(', '));
@@ -91,7 +93,11 @@ module.exports = function(app) {
     }
 
     // Devices come as numbers; keep leading zeros so the subnet code stays 6 chars
+    // (object keys are always strings, so a decimal key is turned back into a number first)
     function toDeviceCode(number) {
+        if (typeof number === 'string' && /^\d+$/.test(number)) {
+            number = Number(number);
+        }
         return number.toString(16).toUpperCase().padStart(8, '0');
     }
 }
