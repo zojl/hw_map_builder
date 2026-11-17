@@ -50,6 +50,7 @@ jobs:
           docker run --rm "${{ env.IMAGE }}:sha-${GITHUB_SHA::7}" node -e "
             for (const f of ['./app/messages/plain.js', './app/messages/service.js', './app/dbUtil/dbPusher.js']) require(f);
             require('sequelize'); require('pg'); require('node-vk-bot-api'); require('@sentry/browser');
+            require('fs').statSync('./app/web/public/build/map3d.js');
             console.log('node', process.version, 'modules load OK');
           "
 
