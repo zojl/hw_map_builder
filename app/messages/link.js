@@ -19,6 +19,9 @@ module.exports = function(app) {
     
     const handleLinks = async (ctx) => {
         const subnet = await app.getSubnetFromMessage(ctx);
+        if (subnet === null) {
+            return;
+        }
 
         const args = ctx.message.text.split(' ');
         if (
@@ -53,6 +56,9 @@ module.exports = function(app) {
     
     const handleReverseLinks = async (ctx) => {
         const subnet = await app.getSubnetFromMessage(ctx);
+        if (subnet === null) {
+            return;
+        }
 
         const args = ctx.message.text.split(' ');
         if (

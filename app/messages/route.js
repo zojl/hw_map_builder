@@ -24,6 +24,9 @@ module.exports = function(app) {
 			return;
 		}
 		const subnet = await app.getSubnetFromChat(chat);
+		if (subnet === null) {
+			return;
+		}
 		let dates = app.getDates();
 
 		const args = ctx.message.text.split(' ');
@@ -81,6 +84,9 @@ module.exports = function(app) {
 			return;
 		}
 		const subnet = await app.getSubnetFromChat(chat);
+		if (subnet === null) {
+			return;
+		}
 
 		let dates = app.getDates();
 		let targetFromReply = null;

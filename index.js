@@ -111,14 +111,18 @@ app.getChatFromMessage = async function(ctx) {
 }
 
 app.getSubnetFromChat = async function(chat) {
+  if (chat === null) {
+    return null;
+  }
+
   if (typeof(chat.subnet) === 'undefined') {
-    console.log(`Chat ${chat} is badly registered`);
+    console.log(`Chat ${chat.peerId} is badly registered`);
     return null;
   }
 
   const subnet = await app.repository.subnet.getOneById(chat.subnet);
   if (subnet === null) {
-    console.log(`Chat ${chat} is badly registered`);
+    console.log(`Chat ${chat.peerId} is badly registered`);
     return null;
     //ctx.reply('Ошибка получения подсети, обратитесь в техподдержку.');
   }

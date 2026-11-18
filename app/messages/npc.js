@@ -9,6 +9,9 @@ module.exports = function(app) {
             return;
         }
         const subnet = await app.getSubnetFromChat(chat);
+        if (subnet === null) {
+            return;
+        }
         
         if (!chat.canSeeNpc) {
             ctx.reply('Эта команда не разрешена в этом чате.');

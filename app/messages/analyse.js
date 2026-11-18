@@ -9,6 +9,9 @@ module.exports = function(app) {
 
 	async function handleCommand(ctx) {
 		const subnet = await app.getSubnetFromMessage(ctx);
+		if (subnet === null) {
+			return;
+		}
 		let dates = app.getDates();
 
 		const args = ctx.message.text.split(' ');

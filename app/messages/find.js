@@ -15,6 +15,9 @@ module.exports = function(app) {
             return;
         }
         const subnet = await app.getSubnetFromChat(chat);
+        if (subnet === null) {
+            return;
+        }
 
         const args = ctx.message.text.match(/[a-f0-9]{2}/gi);
         if (
@@ -78,6 +81,9 @@ module.exports = function(app) {
 
     const handleReverseLinks = async (ctx) => {
         const subnet = await app.getSubnetFromMessage(ctx);
+        if (subnet === null) {
+            return;
+        }
 
         const args = ctx.message.text.split(' ');
         if (

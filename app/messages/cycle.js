@@ -17,6 +17,9 @@ module.exports = function(app) {
             return;
         }
         const subnet = await app.getSubnetFromChat(chat);
+        if (subnet === null) {
+            return;
+        }
 
         const args = ctx.message.text.split(' ');
         if (
