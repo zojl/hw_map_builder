@@ -22,10 +22,11 @@ module.exports =
                 "timestamp": null,
                 "transit": [ //куда пересылать
                     "alliance", //чат союза
-                    "statbot", //статбот
-                    "map", //интерактивная карта
+                    // "statbot", //статбот
+                    // "map", //интерактивная карта
                     "underbot", //"недо-бот" NK
-                    "nhsmap", //бот НХС
+                    // "nhsmap", //бот НХС
+                    // "vipub", //открытая карта от VI
                 ],
                 "no_transit": [] //кому не пересылать
             }
