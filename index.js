@@ -40,13 +40,10 @@ app.db = new Sequelize(process.env.DB, {logging: process.env.ENV.toLowerCase() =
 
 app.db.Op = Sequelize.Op;
 app.model = {};
-fs.readdir('./app/model/', function (err, files) {
-  for (const scriptname of files) {
-    const modelname = scriptname.split('.')[0];
-    app.model[modelname] = require('./app/model/' + scriptname)(app.db, Sequelize);
-    app.model[modelname].sync();
-  };
-});
+for (const scriptname of fs.readdirSync('./app/model/')) {
+  const modelname = scriptname.split('.')[0];
+  app.model[modelname] = require('./app/model/' + scriptname)(app.db, Sequelize);
+}
 app.db.query("CREATE EXTENSION IF NOT EXISTS PostGIS;");
 app.db.query("CREATE EXTENSION IF NOT EXISTS pgRouting;");
 app.db.query(`CREATE OR REPLACE FUNCTION hex2dec(in_hex TEXT)
@@ -54,27 +51,52 @@ RETURNS INT
 IMMUTABLE STRICT LANGUAGE sql AS $body$
   SELECT CAST(CAST(('x' || CAST($1 AS text)) AS bit(8)) AS INT);
 $body$;`);
-// chats used to be synced a second time with {alter: true}: it raced with the plain sync and
-// added one more unique constraint on peerId on every start. Drop those duplicates.
-app.db.query(`DO $$
-DECLARE c text;
-BEGIN
-  FOR c IN SELECT conname FROM pg_constraint
-           WHERE conrelid = to_regclass('chats') AND contype = 'u' AND conname ~ '^chats_peerId_key[0-9]+$' LOOP
-    EXECUTE format('ALTER TABLE chats DROP CONSTRAINT %I', c);
-  END LOOP;
-END $$;`);
-// sync() doesn't change existing columns: widen vkUser where it's still INTEGER (no-op after)
-app.db.query(`DO $$
-DECLARE t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY['npcLocations', 'serviceLocations'] LOOP
-    IF EXISTS (SELECT 1 FROM information_schema.columns
-               WHERE table_name = t AND column_name = 'vkUser' AND data_type = 'integer') THEN
-      EXECUTE format('ALTER TABLE %I ALTER COLUMN "vkUser" TYPE BIGINT', t);
+
+// Schema changes that sync() can't make: it creates missing tables but never alters existing ones.
+// Each is a no-op once applied or on a fresh database. They run one by one and before sync():
+// sync() reads the table's indexes from the catalog, and DDL running at the same time fails that
+// read with "cache lookup failed".
+const schemaChanges = [
+  // chats used to be synced a second time with {alter: true}, which added one more unique
+  // constraint on peerId on every start. Drop those duplicates.
+  `DO $$
+  DECLARE c text;
+  BEGIN
+    FOR c IN SELECT conname FROM pg_constraint
+             WHERE conrelid = to_regclass('chats') AND contype = 'u' AND conname ~ '^chats_peerId_key[0-9]+$' LOOP
+      EXECUTE format('ALTER TABLE chats DROP CONSTRAINT %I', c);
+    END LOOP;
+  END $$;`,
+  // VK user IDs no longer fit into INTEGER
+  `DO $$
+  DECLARE t text;
+  BEGIN
+    FOREACH t IN ARRAY ARRAY['npcLocations', 'serviceLocations'] LOOP
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = t AND column_name = 'vkUser' AND data_type = 'integer') THEN
+        EXECUTE format('ALTER TABLE %I ALTER COLUMN "vkUser" TYPE BIGINT', t);
+      END IF;
+    END LOOP;
+  END $$;`,
+  // /history has its own permission, apart from canSeeNpc
+  `DO $$
+  BEGIN
+    IF to_regclass('chats') IS NOT NULL THEN
+      ALTER TABLE chats ADD COLUMN IF NOT EXISTS "canSeeHistory" BOOLEAN;
     END IF;
-  END LOOP;
-END $$;`);
+  END $$;`,
+];
+(async () => {
+  for (const sql of schemaChanges) {
+    await app.db.query(sql);
+  }
+  for (const model of Object.values(app.model)) {
+    await model.sync();
+  }
+})().catch((err) => {
+  console.error('Database schema update failed:', err);
+  Sentry.captureException(err);
+});
 
 app.repository = {};
 fs.readdir('./app/repository/', function (err, files) {

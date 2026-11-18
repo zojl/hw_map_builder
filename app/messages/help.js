@@ -1,5 +1,5 @@
 // /help: the commands this chat can use. Like the commands themselves it works only in chats
-// with a subnet, and lists NPC and service commands only where the chat may see them.
+// with a subnet, and lists NPC and service commands (and /history) only where the chat may use them.
 module.exports = function(app) {
     app.bot.command('/help', async (ctx) => {
         await handleHelp(ctx);
@@ -44,16 +44,25 @@ module.exports = function(app) {
         }
         sections.push(mapLines.join('\n'));
 
+        const npcLines = [];
         if (chat.canSeeNpc) {
-            sections.push([
-                'NPC и сервисы:',
+            npcLines.push(
                 '/npc [00] — где NPC за последние сутки; с устройством — ещё и пути от него',
                 '/svc [00] — последние перемещения сервисов; с устройством — ещё и пути от него (/service)',
-                '/history [имя] — как менялись NPC: тип, команда, имя, уровень (/hist)',
+            );
+        }
+        if (chat.canSeeHistory) {
+            npcLines.push('/history [имя] — как менялись NPC: тип, команда, имя, уровень (/hist)');
+        }
+        if (chat.canSeeNpc) {
+            npcLines.push(
                 '/sub имя — подписать чат на перемещения NPC или сервиса',
                 '/unsub имя — отписать чат',
                 '/subs — на что подписан чат',
-            ].join('\n'));
+            );
+        }
+        if (npcLines.length > 0) {
+            sections.push(['NPC и сервисы:', ...npcLines].join('\n'));
         }
 
         ctx.reply(sections.join('\n\n'));

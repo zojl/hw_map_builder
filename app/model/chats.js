@@ -23,6 +23,11 @@ module.exports = function(sequelize, DataTypes) {
             type: DataTypes.BOOLEAN(),
             allowNull: true,
         },
+        // /history; existing tables get the column in index.js
+        canSeeHistory: {
+            type: DataTypes.BOOLEAN(),
+            allowNull: true,
+        },
         comment: {
             type: DataTypes.STRING(256),
             allowNull: true,

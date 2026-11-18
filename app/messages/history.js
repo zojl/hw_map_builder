@@ -19,7 +19,7 @@ module.exports = function(app) {
             return;
         }
 
-        if (!chat.canSeeNpc) {
+        if (!chat.canSeeHistory) {
             ctx.reply('Эта команда не разрешена в этом чате.');
             return;
         }
