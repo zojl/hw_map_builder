@@ -26,8 +26,9 @@ module.exports = function(sequelize, DataTypes) {
             type: DataTypes.DATE(),
             allowNull: false,
         },
+        // VK user IDs no longer fit into INTEGER; existing tables are altered in index.js
         vkUser: {
-            type: DataTypes.INTEGER(),
+            type: DataTypes.BIGINT(),
             allowNull: false,
         },
         // Parsed observation, see app/hw/parser.js. Added by scripts/migrate-names.js

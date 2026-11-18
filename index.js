@@ -55,6 +55,17 @@ RETURNS INT
 IMMUTABLE STRICT LANGUAGE sql AS $body$
   SELECT CAST(CAST(('x' || CAST($1 AS text)) AS bit(8)) AS INT);
 $body$;`);
+// sync() doesn't change existing columns: widen vkUser where it's still INTEGER (no-op after)
+app.db.query(`DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['npcLocations', 'serviceLocations'] LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = t AND column_name = 'vkUser' AND data_type = 'integer') THEN
+      EXECUTE format('ALTER TABLE %I ALTER COLUMN "vkUser" TYPE BIGINT', t);
+    END IF;
+  END LOOP;
+END $$;`);
 
 app.repository = {};
 fs.readdir('./app/repository/', function (err, files) {
