@@ -151,6 +151,7 @@ require('./app/messages/map.js')(app);
 require('./app/messages/matrix.js')(app);
 
 require('./app/messages/chat.js')(app);
+require('./app/messages/help.js')(app);
 
 require('./app/messages/plain.js')(app);
 
