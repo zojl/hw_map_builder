@@ -46,7 +46,6 @@ fs.readdir('./app/model/', function (err, files) {
     app.model[modelname] = require('./app/model/' + scriptname)(app.db, Sequelize);
     app.model[modelname].sync();
   };
-  app.model.chats.sync({alter:true})
 });
 app.db.query("CREATE EXTENSION IF NOT EXISTS PostGIS;");
 app.db.query("CREATE EXTENSION IF NOT EXISTS pgRouting;");
@@ -55,6 +54,16 @@ RETURNS INT
 IMMUTABLE STRICT LANGUAGE sql AS $body$
   SELECT CAST(CAST(('x' || CAST($1 AS text)) AS bit(8)) AS INT);
 $body$;`);
+// chats used to be synced a second time with {alter: true}: it raced with the plain sync and
+// added one more unique constraint on peerId on every start. Drop those duplicates.
+app.db.query(`DO $$
+DECLARE c text;
+BEGIN
+  FOR c IN SELECT conname FROM pg_constraint
+           WHERE conrelid = to_regclass('chats') AND contype = 'u' AND conname ~ '^chats_peerId_key[0-9]+$' LOOP
+    EXECUTE format('ALTER TABLE chats DROP CONSTRAINT %I', c);
+  END LOOP;
+END $$;`);
 // sync() doesn't change existing columns: widen vkUser where it's still INTEGER (no-op after)
 app.db.query(`DO $$
 DECLARE t text;
