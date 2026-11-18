@@ -54,6 +54,12 @@ module.exports = function(app) {
             return;
         }
 
+        // Checked on every open, so turning the flag off also closes links already given out
+        if (!chat.canSeeMap) {
+            sendMessage(res, 403, 'Карта для этого чата недоступна.');
+            return;
+        }
+
         console.log(`Map of subnet ${subnet.code} opened by link of chat ${chat.id} (peer ${chat.peerId}), user ${link.userId}, from ${req.ip} ${req.get('x-forwarded-for') || ''}`);
 
         const day = app.getDates().day;

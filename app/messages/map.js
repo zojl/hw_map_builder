@@ -10,6 +10,11 @@ module.exports = function(app) {
             return;
         }
 
+        if (!chat.canSeeMap) {
+            ctx.reply('Эта команда не разрешена в этом чате.');
+            return;
+        }
+
         if (!app.service.mapLink.isEnabled()) {
             ctx.reply('Карта не настроена на сервере.');
             return;

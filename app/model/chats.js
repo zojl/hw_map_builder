@@ -28,6 +28,11 @@ module.exports = function(sequelize, DataTypes) {
             type: DataTypes.BOOLEAN(),
             allowNull: true,
         },
+        // /map and the map page; existing tables get the column in index.js
+        canSeeMap: {
+            type: DataTypes.BOOLEAN(),
+            allowNull: true,
+        },
         comment: {
             type: DataTypes.STRING(256),
             allowNull: true,

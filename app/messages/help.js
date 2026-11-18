@@ -39,7 +39,7 @@ module.exports = function(app) {
             '/matrix 00 0F — связи диапазона в виде сетки, если они её образуют',
             '/stats [00 7F] — сколько устройств уже найдено, во всей подсети или в диапазоне',
         ];
-        if (app.service.mapLink.isEnabled()) {
+        if (chat.canSeeMap && app.service.mapLink.isEnabled()) {
             mapLines.push('/map — ссылка на карту подсети');
         }
         sections.push(mapLines.join('\n'));

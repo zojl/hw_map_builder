@@ -78,11 +78,12 @@ const schemaChanges = [
       END IF;
     END LOOP;
   END $$;`,
-  // /history has its own permission, apart from canSeeNpc
+  // Permission flags of /history and /map, apart from canSeeNpc
   `DO $$
   BEGIN
     IF to_regclass('chats') IS NOT NULL THEN
       ALTER TABLE chats ADD COLUMN IF NOT EXISTS "canSeeHistory" BOOLEAN;
+      ALTER TABLE chats ADD COLUMN IF NOT EXISTS "canSeeMap" BOOLEAN;
     END IF;
   END $$;`,
 ];
