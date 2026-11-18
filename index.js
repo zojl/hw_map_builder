@@ -125,7 +125,7 @@ app.getChatFromMessage = async function(ctx) {
   const chat = await app.repository.chat.getOneByPeerId(ctx.message.peer_id)
   if (chat === null) {
     console.log(`Chat ${ctx.message.peer_id} is not registered`);
-    ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте.');
+    ctx.reply('Эта команда работает только в чатах, которым назначены подсети в боте. Чтобы подключить чат, отправь /chat и передай ID чата администратору бота.');
     return null;
   }
 
